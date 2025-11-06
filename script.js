@@ -475,6 +475,182 @@ function getBandForPair(tp, originName, destName){
 /* 팀 주요 직급 셀렉터 옵션 */
 const TEAM_RANK_OPTIONS = ['사원','대리','과·차 이상'];
 
+/* ===================== SETTINGS 렌더링 ===================== */
+function renderSettings(){
+  const el = document.getElementById('settingsContent'); 
+  if (!el) return;
+  
+  const S = state.settings;
+  const js = S.jobSessionsPerHead || {customer:1, nonCustomer:1};
+
+  let html = `
+    <div class="section-card">
+      <div class="section-header">
+        <div class="description">
+          <h2>① 기본 설정</h2>
+          <p>연도, 통화, 법정의무 예산 등 전체 시스템의 기준값을 설정합니다.</p>
+        </div>
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label>연도</label>
+          <input type="number" value="${S.year||2026}" onchange="updateSetting('year', this.value)">
+        </div>
+        <div class="field">
+          <label>통화</label>
+          <input type="text" value="${escapeHtml(S.currency||'KRW')}" onchange="updateSetting('currency', this.value)">
+        </div>
+        <div class="field">
+          <label>법정의무 기본예산(원)</label>
+          <input type="text" inputmode="numeric" value="${formatNumberInput(S.legalBaseBudget||0)}" onchange="updateSetting('legalBaseBudget', this.value)">
+          ${hangulHintHtml(S.legalBaseBudget||0)}
+        </div>
+        <div class="field">
+          <label>직무 기타비용 기본값(원)</label>
+          <input type="text" inputmode="numeric" value="${formatNumberInput(S.jobDefaultOtherCost||0)}" onchange="updateSetting('jobDefaultOtherCost', this.value)">
+          ${hangulHintHtml(S.jobDefaultOtherCost||0)}
+        </div>
+        <div class="field">
+          <label>팀배분: 고객사 차수(1인당)</label>
+          <input type="number" min="0" step="0.1" value="${js.customer}" onchange="updateSetting('jobSessionsCustomer', this.value)">
+        </div>
+        <div class="field">
+          <label>팀배분: 비고객사 차수(1인당)</label>
+          <input type="number" min="0" step="0.1" value="${js.nonCustomer}" onchange="updateSetting('jobSessionsNonCustomer', this.value)">
+        </div>
+      </div>
+    </div>
+
+    ${renderLeadershipSection(S)}
+    ${renderJobSegmentSection(S)}
+    ${renderHierarchySection(S)}
+    ${renderLegalSection(S)}
+    ${renderTravelPolicySection(S)}
+    ${renderTeamSettingsSection(S)}
+  `;
+
+  el.innerHTML = html;
+}
+
+function renderLeadershipSection(S){
+  const rows = (S.leadershipLevels||[]).map(lv=>`
+    <tr>
+      <td><input type="text" value="${escapeHtml(lv.level||'')}" onchange="updateLeadershipLevel('${lv.id}','level',this.value)"></td>
+      <td>
+        <input type="text" inputmode="numeric" value="${formatNumberInput(lv.unitCost||0)}" onchange="updateLeadershipLevel('${lv.id}','unitCost',this.value)">
+        ${hangulHintHtml(lv.unitCost||0)}
+      </td>
+      <td><button class="button button-tertiary" onclick="removeLeadershipLevel('${lv.id}')">삭제</button></td>
+    </tr>`).join('');
+
+  return `
+  <div class="section-card">
+    <div class="section-header">
+      <div class="description">
+        <h2>② 리더십 레벨</h2>
+        <p>핵심리더, 책임리더 등 계층별 단가를 설정합니다.</p>
+      </div>
+      <button class="button button-secondary" onclick="addLeadershipLevel()">+ 추가</button>
+    </div>
+    <div class="summary-table"><table>
+      <thead><tr><th>계층</th><th>단가(원)</th><th>삭제</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function renderJobSegmentSection(S){
+  const rows = (S.jobSegments||[]).map(seg=>`
+    <tr>
+      <td><input type="text" value="${escapeHtml(seg.name||'')}" onchange="updateJobSegment('${seg.id}','name',this.value)"></td>
+      <td><input type="text" inputmode="numeric" value="${formatNumberInput(seg.ratio||0)}" onchange="updateJobSegment('${seg.id}','ratio',this.value)"></td>
+      <td>
+        <input type="text" inputmode="numeric" value="${formatNumberInput(seg.unitCost||0)}" onchange="updateJobSegment('${seg.id}','unitCost',this.value)">
+        ${hangulHintHtml(seg.unitCost||0)}
+      </td>
+      <td>
+        <select onchange="updateJobSegment('${seg.id}','category',this.value)">
+          <option value="고객사" ${seg.category==='고객사'?'selected':''}>고객사</option>
+          <option value="고객사 외" ${seg.category!=='고객사'?'selected':''}>고객사 외</option>
+        </select>
+      </td>
+      <td><button class="button button-tertiary" onclick="removeJobSegment('${seg.id}')">삭제</button></td>
+    </tr>`).join('');
+
+  return `
+  <div class="section-card">
+    <div class="section-header">
+      <div class="description">
+        <h2>③ 직무 교육 세그먼트</h2>
+        <p>OEM 프로젝트, 협력사 위탁 등 비율·단가·카테고리를 설정합니다.</p>
+      </div>
+      <button class="button button-secondary" onclick="addJobSegment()">+ 추가</button>
+    </div>
+    <div class="summary-table"><table>
+      <thead><tr><th>유형명</th><th>비율(%)</th><th>단가(원)</th><th>카테고리</th><th>삭제</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function renderHierarchySection(S){
+  const rows = (S.hierarchyLevels||[]).map(lv=>`
+    <tr>
+      <td><input type="text" value="${escapeHtml(lv.level||'')}" onchange="updateHierarchyLevel('${lv.id}','level',this.value)"></td>
+      <td><input type="text" inputmode="numeric" value="${formatNumberInput(lv.participation||0)}" onchange="updateHierarchyLevel('${lv.id}','participation',this.value)"></td>
+      <td>
+        <input type="text" inputmode="numeric" value="${formatNumberInput(lv.unitCost||0)}" onchange="updateHierarchyLevel('${lv.id}','unitCost',this.value)">
+        ${hangulHintHtml(lv.unitCost||0)}
+      </td>
+      <td><button class="button button-tertiary" onclick="removeHierarchyLevel('${lv.id}')">삭제</button></td>
+    </tr>`).join('');
+
+  return `
+  <div class="section-card">
+    <div class="section-header">
+      <div class="description">
+        <h2>④ 직급 공통 교육</h2>
+        <p>사원·대리·과장·차장 이상 직급별 참여율과 단가를 설정합니다.</p>
+      </div>
+      <button class="button button-secondary" onclick="addHierarchyLevel()">+ 추가</button>
+    </div>
+    <div class="summary-table"><table>
+      <thead><tr><th>직급</th><th>참여율(%)</th><th>단가(원)</th><th>삭제</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function renderLegalSection(S){
+  const rows = (S.legalTypes||[]).map(t=>`
+    <tr>
+      <td><input type="text" value="${escapeHtml(t.type||'')}" onchange="updateLegalType('${t.id}','type',this.value)"></td>
+      <td><input type="text" inputmode="numeric" value="${formatNumberInput(t.ratio||0)}" onchange="updateLegalType('${t.id}','ratio',this.value)"></td>
+      <td>
+        <input type="text" inputmode="numeric" value="${formatNumberInput(t.unitCost||0)}" onchange="updateLegalType('${t.id}','unitCost',this.value)">
+        ${hangulHintHtml(t.unitCost||0)}
+      </td>
+      <td><button class="button button-tertiary" onclick="removeLegalType('${t.id}')">삭제</button></td>
+    </tr>`).join('');
+
+  return `
+  <div class="section-card">
+    <div class="section-header">
+      <div class="description">
+        <h2>⑤ 법정의무 교육</h2>
+        <p>산업안전, 개인정보보호 등 법정교육 항목별 비율과 단가를 설정합니다.</p>
+      </div>
+      <button class="button button-secondary" onclick="addLegalType()">+ 추가</button>
+    </div>
+    <div class="summary-table"><table>
+      <thead><tr><th>항목</th><th>비율(%)</th><th>단가(원)</th><th>삭제</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+/* === Travel Policy 섹션 (이미 존재하는 함수) === */
+
 /* === Travel Policy 렌더 (교통비.xlsx 업로드 포함) === */
 function renderTravelPolicySection(settings){
   const tp = settings.travelPolicy; initTravelMatrixIfNeeded(tp);
@@ -1445,3 +1621,4 @@ function renderLegalSection(S){
    your-repo/
    ├── index.html (위의 수정된 버전)
    └── script.js (renderSettings() 함수 추가된 버전)
+
