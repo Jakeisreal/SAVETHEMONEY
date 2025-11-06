@@ -38,13 +38,18 @@ function skipOnboarding(){ state.onboardingShown = true; persistState(); documen
 function switchTab(event, tabName){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
-  event?.currentTarget?.classList.add('active');
-  document.getElementById(tabName)?.classList.add('active');
+  if(event?.currentTarget) event.currentTarget.classList.add('active');
+  const targetContent = document.getElementById(tabName);
+  if(targetContent) targetContent.classList.add('active');
+  
   if (tabName==='dashboard') renderDashboard();
   if (tabName==='report') renderReport();
+  if (tabName==='settings') renderSettings();
+  if (tabName==='plan') renderPlanEntry();
+  if (tabName==='summary') renderSummary();
+  
   updateProgressTracker();
 }
-
 /* ===================== 저장/로드 ===================== */
 function loadState(){
   const defaults = {
@@ -517,8 +522,6 @@ function renderLegalSection(S){
     </table></div>
   </div>`;
 }
-
-/* === Travel Policy 섹션 (이미 존재하는 함수) === */
 
 /* === Travel Policy CRUD/유틸 === */
 function addOrigin(){
@@ -1442,7 +1445,7 @@ function renderReport(){
 
 /* ===================== window 바인딩 ===================== */
 Object.assign(window, {
-  startOnboarding, skipOnboarding, switchTab,
+  startOnboarding, skipOnboarding, showOnboarding, switchTab,  // switchTab 추가!
   updateSetting,
   addLeadershipLevel, removeLeadershipLevel, updateLeadershipLevel,
   addJobSegment, removeJobSegment, updateJobSegment,
@@ -1453,7 +1456,8 @@ Object.assign(window, {
   updateMatrixAmount, updateMatrixBand, updatePerDiemRule,
   addTeam, removeTeam, updateTeam,
   downloadTeamsTemplate, exportTeamsToCSV, triggerTeamsUpload, handleTeamsFile,
-  triggerTravelXlsx, handleTravelXlsx
+  triggerTravelXlsx, handleTravelXlsx,
+  addPlanRow, removePlanRow, updatePlanField, updatePlanNumber
 });
 
 /* ===================== SETTINGS 렌더링 (누락된 핵심 함수) ===================== */
@@ -1621,5 +1625,6 @@ function renderLegalSection(S){
    your-repo/
    ├── index.html (위의 수정된 버전)
    └── script.js (renderSettings() 함수 추가된 버전)
+
 
 
