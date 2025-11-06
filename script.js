@@ -1,4 +1,3 @@
-<artifact identifier="education-budget-script" type="application/vnd.ant.code" language="javascript" title="script.js - 교육비 예산 수립 시스템">
 /* script.js - 교육비 사업계획 플래너 (교통비.xlsx + 직급별 Per-Diem 반영 통합본)
  * - SETTINGS: 교통비.xlsx 업로드 → 출발지×목적지 요금/권역 자동반영
  * - Per-Diem: 원거리 시 직급별(사원/대리/과·차 이상) 금액 적용, 근거리는 밴드별 일당/숙박 토글 유지
@@ -73,15 +72,13 @@ jobSessionsPerHead: { customer: 1, nonCustomer: 1 }, // 팀 자동배분용 1인
 avgJobSessionsPerPerson: 1, // 표기용
 
 leadershipLevels: [
-  { id: gen('lead'), level:'핵심 리더', unitCost:680000 },
-  { id: gen('lead'), level:'책임 리더', unitCost:540000 },
-  { id: gen('lead'), level:'중간관리자', unitCost:620000 }
+  { id: gen('lead'), level:'임원', unitCost:680000 },
+  { id: gen('lead'), level:'팀장', unitCost:540000 },
 ],
 jobSegments: [
-  { id: gen('jobseg'), name:'OEM 프로젝트 운영',    ratio:35, unitCost:420000, category:'고객사' },
-  { id: gen('jobseg'), name:'협력사 전문기술 위탁', ratio:25, unitCost:380000, category:'고객사 외' },
-  { id: gen('jobseg'), name:'사내 아카데미',        ratio:20, unitCost:220000, category:'고객사 외' },
-  { id: gen('jobseg'), name:'품질 강화 과정',       ratio:20, unitCost:320000, category:'고객사 외' }
+  { id: gen('jobseg'), name:'사내강사양성교육', ratio:30, unitCost:400000, category:'고객사 외' },
+  { id: gen('jobseg'), name:'품질부문 교육', ratio:30, unitCost:380000, category:'고객사 외' },
+  { id: gen('jobseg'), name:'AI 역량 강화 교육', ratio:40, unitCost:500000, category:'고객사 외' },
 ],
 
 /* === 출장비 정책 ===
@@ -92,10 +89,10 @@ jobSegments: [
      - NEW: perRankByBand['원거리'][rank] = 직급별 일당
 */
 travelPolicy: {
-  origins: [ { id: gen('org'), name:'본사' }, { id: gen('org'), name:'울산공장' } ],
+  origins: [ { id: gen('org'), name:'본사(영천)' }, { id: gen('org'), name:'경산' }, { id: gen('org'), name:'예산' }, { id: gen('org'), name:'안양' } ],
   destinations: [
-    { id: gen('dst'), name:'서울/본사', band:'원거리' },
-    { id: gen('dst'), name:'울산',     band:'근거리' }
+    { id: gen('dst'), name:'서울', band:'원거리' },
+    { id: gen('dst'), name:'울산', band:'근거리' }
   ],
   matrix: {},
   bandMatrix: {},
@@ -112,10 +109,9 @@ travelPolicy: {
 },
 
 hierarchyLevels: [
-  { id: gen('hier'), level:'사원',      participation:90, unitCost:210000 },
-  { id: gen('hier'), level:'대리',      participation:85, unitCost:230000 },
-  { id: gen('hier'), level:'과장',      participation:80, unitCost:260000 },
-  { id: gen('hier'), level:'차장 이상',  participation:70, unitCost:290000 }
+  { id: gen('hier'), level:'주임',      participation:90, unitCost:210000 },
+  { id: gen('hier'), level:'선임',      participation:85, unitCost:230000 },
+  { id: gen('hier'), level:'책임',      participation:80, unitCost:260000 },
 ],
 legalTypes: [
   { id: gen('legal'), type:'산업안전',              ratio:40, unitCost:85000 },
@@ -1235,4 +1231,3 @@ downloadTeamsTemplate, exportTeamsToCSV, triggerTeamsUpload, handleTeamsFile,
 triggerTravelXlsx, handleTravelXlsx,
 addPlanRow, removePlanRow, updatePlanField, updatePlanNumber
 });
-</artifact>
