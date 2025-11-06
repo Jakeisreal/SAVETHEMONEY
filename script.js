@@ -344,137 +344,6 @@ function updateLegalType(id, field, value){ const it=state.settings.legalTypes.f
 function removeLegalType(id){ state.settings.legalTypes = state.settings.legalTypes.filter(t=>t.id!==id); persistState(); renderSettings(); }
 function addLegalType(){ state.settings.legalTypes.push({ id:gen('legal'), type:'새 항목', ratio:0, unitCost:0 }); persistState(); renderSettings(); }
 
-/* === Travel Policy CRUD/유틸 === */
-function addOrigin(){
-  const name = `출발지${state.settings.travelPolicy.origins.length+1}`;
-  state.settings.travelPolicy.origins.push({ id:gen('org'), name });
-  initTravelMatrixIfNeeded(state.settings.travelPolicy);
-  persistState(); renderSettings(); renderSummary();
-}
-function removeOrigin(id){
-  const tp = state.settings.travelPolicy;
-  const o = tp.origins.find(x=>x.id===id); if(!o) return;
-  delete tp.matrix[o.name]; delete tp.bandMatrix[o.name];
-  tp.origins = tp.origins.filter(x=>x.id!==id);
-  const fallback = firstOriginName();
-  state.settings.teams = state.settings.teams.map(t=> ({ ...t, origin: tp.origins.some(y=>y.name===t.origin)? t.origin : fallback }));
-  persistState(); renderSettings(); renderSummary();
-}
-function updateOriginName(id, value){
-  const tp = state.settings.travelPolicy;
-  const origin = tp.origins.find(x=>x.id===id); if(!origin) return;
-  const prevName = origin.name;
-  const nextName = String(value||'').trim() || prevName;
-  if (prevName===nextName) return;
-  origin.name = nextName;
-  tp.matrix[nextName] = { ...(tp.matrix[prevName]||{}) }; delete tp.matrix[prevName];
-  tp.bandMatrix[nextName] = { ...(tp.bandMatrix[prevName]||{}) }; delete tp.bandMatrix[prevName];
-  state.settings.teams.forEach(t=>{ if (t.origin===prevName) t.origin=nextName; });
-  persistState(); renderSettings(); renderSummary();
-}
-
-function addDestination(){
-  const name = `목적지${state.settings.travelPolicy.destinations.length + 1}`;
-  state.settings.travelPolicy.destinations.push({ id: gen('dst'), name, band: '근거리' });
-  const tp = state.settings.travelPolicy; initTravelMatrixIfNeeded(tp);
-  Object.keys(tp.matrix).forEach(o=>{
-    if (!tp.matrix[o]) tp.matrix[o] = {};
-    if (!tp.bandMatrix[o]) tp.bandMatrix[o] = {};
-    if (tp.matrix[o][name] === undefined) tp.matrix[o][name] = 20000;
-    if (tp.bandMatrix[o][name] === undefined) tp.bandMatrix[o][name] = '근거리';
-  });
-  persistState(); renderSettings(); renderSummary();
-}
-function removeDestination(id){
-  const tp = state.settings.travelPolicy;
-  const d = tp.destinations.find(x=>x.id===id); if(!d) return;
-  const name = d.name;
-  tp.destinations = tp.destinations.filter(x=>x.id!==id);
-  Object.keys(tp.matrix).forEach(o=>{
-    delete tp.matrix[o][name];
-    if (tp.bandMatrix[o]) delete tp.bandMatrix[o][name];
-  });
-  const fallback = firstDestinationName();
-  state.settings.teams = state.settings.teams.map(t=> ({
-    ...t,
-    customerDestination: (t.customerDestination===name? fallback : t.customerDestination),
-    nonCustomerDestination: (t.nonCustomerDestination===name? fallback : t.nonCustomerDestination)
-  }));
-  persistState(); renderSettings(); renderSummary();
-}
-function updateDestinationField(id, field, value){
-  const tp = state.settings.travelPolicy;
-  const d = tp.destinations.find(x=>x.id===id); if(!d) return;
-  const prevName = d.name;
-
-  if (field==='name'){
-    const next = String(value||'').trim() || prevName;
-    if (next===prevName) return;
-    d.name = next;
-    Object.keys(tp.matrix).forEach(o=>{
-      const row = tp.matrix[o]; row[next] = row[prevName]; delete row[prevName];
-      const brow = tp.bandMatrix[o]; if (brow){ brow[next] = brow[prevName]; delete brow[prevName]; }
-    });
-    state.settings.teams.forEach(t=>{
-      if (t.customerDestination===prevName) t.customerDestination=next;
-      if (t.nonCustomerDestination===prevName) t.nonCustomerDestination=next;
-    });
-  } else if (field==='band'){
-    d.band = value==='원거리' ? '원거리' : '근거리';
-  }
-  persistState(); renderSettings(); renderSummary();
-}
-
-function updateMatrixAmount(originName, destName, value){
-  const tp = state.settings.travelPolicy;
-  const amt = parseNumberInput(value) ?? 0;
-  if (!tp.matrix[originName]) tp.matrix[originName] = {};
-  tp.matrix[originName][destName] = amt;
-  persistState(); renderSettings(); renderSummary();
-}
-function updateMatrixBand(originName, destName, value){
-  const tp = state.settings.travelPolicy;
-  if (!tp.bandMatrix[originName]) tp.bandMatrix[originName] = {};
-  tp.bandMatrix[originName][destName] = (value==='원거리' ? '원거리' : '근거리');
-  persistState(); renderSettings(); renderSummary();
-}
-
-/* Per-Diem 규칙 UI/업데이트 */
-function updatePerDiemRule(field, value){
-  const r = state.settings.travelPolicy.perDiemRules;
-  if (field==='lodgingPerNight' || field==='defaultNights'){
-    r[field] = Math.max(0, parseNumberInput(value) ?? 0);
-  } else if (field==='perDiemNear'){
-    r.perDiemByBand['근거리'] = Math.max(0, parseNumberInput(value) ?? 0);
-  } else if (field==='perDiemFar'){
-    r.perDiemByBand['원거리'] = Math.max(0, parseNumberInput(value) ?? 0);
-  } else if (field==='applyPerDiemNear'){
-    r.applyPerDiemByBand['근거리'] = !!value.checked;
-  } else if (field==='applyPerDiemFar'){
-    r.applyPerDiemByBand['원거리'] = !!value.checked;
-  } else if (field==='applyLodgingNear'){
-    r.applyLodgingByBand['근거리'] = !!value.checked;
-  } else if (field==='applyLodgingFar'){
-    r.applyLodgingByBand['원거리'] = !!value.checked;
-  } else if (field.startsWith('rankFar_')){
-    const key = field.replace('rankFar_',''); // '사원'|'대리'|'과·차 이상'
-    r.perRankByBand['원거리'][key] = Math.max(0, parseNumberInput(value) ?? 0);
-  }
-  persistState(); renderSettings(); renderSummary();
-}
-
-/* 계산용 헬퍼 */
-function firstOriginName(){ return state.settings.travelPolicy.origins[0]?.name || '본사'; }
-function firstDestinationName(){ return state.settings.travelPolicy.destinations[0]?.name || '서울/본사'; }
-function getBandOfDestination(tp, destName){ const d = tp.destinations.find(x=>x.name===destName); return d?.band || '근거리'; }
-function getBandForPair(tp, originName, destName){
-  const row = (tp.bandMatrix||{})[originName] || {};
-  return row[destName] || getBandOfDestination(tp, destName) || '근거리';
-}
-
-/* 팀 주요 직급 셀렉터 옵션 */
-const TEAM_RANK_OPTIONS = ['사원','대리','과·차 이상'];
-
 /* ===================== SETTINGS 렌더링 ===================== */
 function renderSettings(){
   const el = document.getElementById('settingsContent'); 
@@ -650,6 +519,137 @@ function renderLegalSection(S){
 }
 
 /* === Travel Policy 섹션 (이미 존재하는 함수) === */
+
+/* === Travel Policy CRUD/유틸 === */
+function addOrigin(){
+  const name = `출발지${state.settings.travelPolicy.origins.length+1}`;
+  state.settings.travelPolicy.origins.push({ id:gen('org'), name });
+  initTravelMatrixIfNeeded(state.settings.travelPolicy);
+  persistState(); renderSettings(); renderSummary();
+}
+function removeOrigin(id){
+  const tp = state.settings.travelPolicy;
+  const o = tp.origins.find(x=>x.id===id); if(!o) return;
+  delete tp.matrix[o.name]; delete tp.bandMatrix[o.name];
+  tp.origins = tp.origins.filter(x=>x.id!==id);
+  const fallback = firstOriginName();
+  state.settings.teams = state.settings.teams.map(t=> ({ ...t, origin: tp.origins.some(y=>y.name===t.origin)? t.origin : fallback }));
+  persistState(); renderSettings(); renderSummary();
+}
+function updateOriginName(id, value){
+  const tp = state.settings.travelPolicy;
+  const origin = tp.origins.find(x=>x.id===id); if(!origin) return;
+  const prevName = origin.name;
+  const nextName = String(value||'').trim() || prevName;
+  if (prevName===nextName) return;
+  origin.name = nextName;
+  tp.matrix[nextName] = { ...(tp.matrix[prevName]||{}) }; delete tp.matrix[prevName];
+  tp.bandMatrix[nextName] = { ...(tp.bandMatrix[prevName]||{}) }; delete tp.bandMatrix[prevName];
+  state.settings.teams.forEach(t=>{ if (t.origin===prevName) t.origin=nextName; });
+  persistState(); renderSettings(); renderSummary();
+}
+
+function addDestination(){
+  const name = `목적지${state.settings.travelPolicy.destinations.length + 1}`;
+  state.settings.travelPolicy.destinations.push({ id: gen('dst'), name, band: '근거리' });
+  const tp = state.settings.travelPolicy; initTravelMatrixIfNeeded(tp);
+  Object.keys(tp.matrix).forEach(o=>{
+    if (!tp.matrix[o]) tp.matrix[o] = {};
+    if (!tp.bandMatrix[o]) tp.bandMatrix[o] = {};
+    if (tp.matrix[o][name] === undefined) tp.matrix[o][name] = 20000;
+    if (tp.bandMatrix[o][name] === undefined) tp.bandMatrix[o][name] = '근거리';
+  });
+  persistState(); renderSettings(); renderSummary();
+}
+function removeDestination(id){
+  const tp = state.settings.travelPolicy;
+  const d = tp.destinations.find(x=>x.id===id); if(!d) return;
+  const name = d.name;
+  tp.destinations = tp.destinations.filter(x=>x.id!==id);
+  Object.keys(tp.matrix).forEach(o=>{
+    delete tp.matrix[o][name];
+    if (tp.bandMatrix[o]) delete tp.bandMatrix[o][name];
+  });
+  const fallback = firstDestinationName();
+  state.settings.teams = state.settings.teams.map(t=> ({
+    ...t,
+    customerDestination: (t.customerDestination===name? fallback : t.customerDestination),
+    nonCustomerDestination: (t.nonCustomerDestination===name? fallback : t.nonCustomerDestination)
+  }));
+  persistState(); renderSettings(); renderSummary();
+}
+function updateDestinationField(id, field, value){
+  const tp = state.settings.travelPolicy;
+  const d = tp.destinations.find(x=>x.id===id); if(!d) return;
+  const prevName = d.name;
+
+  if (field==='name'){
+    const next = String(value||'').trim() || prevName;
+    if (next===prevName) return;
+    d.name = next;
+    Object.keys(tp.matrix).forEach(o=>{
+      const row = tp.matrix[o]; row[next] = row[prevName]; delete row[prevName];
+      const brow = tp.bandMatrix[o]; if (brow){ brow[next] = brow[prevName]; delete brow[prevName]; }
+    });
+    state.settings.teams.forEach(t=>{
+      if (t.customerDestination===prevName) t.customerDestination=next;
+      if (t.nonCustomerDestination===prevName) t.nonCustomerDestination=next;
+    });
+  } else if (field==='band'){
+    d.band = value==='원거리' ? '원거리' : '근거리';
+  }
+  persistState(); renderSettings(); renderSummary();
+}
+
+function updateMatrixAmount(originName, destName, value){
+  const tp = state.settings.travelPolicy;
+  const amt = parseNumberInput(value) ?? 0;
+  if (!tp.matrix[originName]) tp.matrix[originName] = {};
+  tp.matrix[originName][destName] = amt;
+  persistState(); renderSettings(); renderSummary();
+}
+function updateMatrixBand(originName, destName, value){
+  const tp = state.settings.travelPolicy;
+  if (!tp.bandMatrix[originName]) tp.bandMatrix[originName] = {};
+  tp.bandMatrix[originName][destName] = (value==='원거리' ? '원거리' : '근거리');
+  persistState(); renderSettings(); renderSummary();
+}
+
+/* Per-Diem 규칙 UI/업데이트 */
+function updatePerDiemRule(field, value){
+  const r = state.settings.travelPolicy.perDiemRules;
+  if (field==='lodgingPerNight' || field==='defaultNights'){
+    r[field] = Math.max(0, parseNumberInput(value) ?? 0);
+  } else if (field==='perDiemNear'){
+    r.perDiemByBand['근거리'] = Math.max(0, parseNumberInput(value) ?? 0);
+  } else if (field==='perDiemFar'){
+    r.perDiemByBand['원거리'] = Math.max(0, parseNumberInput(value) ?? 0);
+  } else if (field==='applyPerDiemNear'){
+    r.applyPerDiemByBand['근거리'] = !!value.checked;
+  } else if (field==='applyPerDiemFar'){
+    r.applyPerDiemByBand['원거리'] = !!value.checked;
+  } else if (field==='applyLodgingNear'){
+    r.applyLodgingByBand['근거리'] = !!value.checked;
+  } else if (field==='applyLodgingFar'){
+    r.applyLodgingByBand['원거리'] = !!value.checked;
+  } else if (field.startsWith('rankFar_')){
+    const key = field.replace('rankFar_',''); // '사원'|'대리'|'과·차 이상'
+    r.perRankByBand['원거리'][key] = Math.max(0, parseNumberInput(value) ?? 0);
+  }
+  persistState(); renderSettings(); renderSummary();
+}
+
+/* 계산용 헬퍼 */
+function firstOriginName(){ return state.settings.travelPolicy.origins[0]?.name || '본사'; }
+function firstDestinationName(){ return state.settings.travelPolicy.destinations[0]?.name || '서울/본사'; }
+function getBandOfDestination(tp, destName){ const d = tp.destinations.find(x=>x.name===destName); return d?.band || '근거리'; }
+function getBandForPair(tp, originName, destName){
+  const row = (tp.bandMatrix||{})[originName] || {};
+  return row[destName] || getBandOfDestination(tp, destName) || '근거리';
+}
+
+/* 팀 주요 직급 셀렉터 옵션 */
+const TEAM_RANK_OPTIONS = ['사원','대리','과·차 이상'];
 
 /* === Travel Policy 렌더 (교통비.xlsx 업로드 포함) === */
 function renderTravelPolicySection(settings){
@@ -1621,4 +1621,5 @@ function renderLegalSection(S){
    your-repo/
    ├── index.html (위의 수정된 버전)
    └── script.js (renderSettings() 함수 추가된 버전)
+
 
