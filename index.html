@@ -3,18 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>교육비 예산 수립 통합 어시스턴트</title>
-
-  <!-- Chart.js (그래프용) -->
+  <title>교육비 예산 수립 통합 어시스턴트 v2.2 (전략연계)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  
-  <!-- SheetJS for Excel parsing -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
   <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     :root {
-      color-scheme: dark;
       --primary: #2a63ff;
       --primary-light: #5790ff;
       --success: #10b981;
@@ -29,81 +23,71 @@
       min-height:100vh; padding:24px; color:#dbe7ff;
     }
 
-    /* 온보딩 오버레이 */
-    .onboarding-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.9); z-index:10000;
-      display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .3s;}
-    .onboarding-overlay.active{ opacity:1; pointer-events:all; }
-    .onboarding-content{
-      background:linear-gradient(135deg,rgba(19,42,86,.98) 0%,rgba(23,60,109,.98) 100%);
-      border:2px solid rgba(100,145,214,.5); border-radius:20px; padding:40px; max-width:600px; text-align:center;
-      box-shadow:0 30px 90px rgba(0,0,0,.8);
+    .save-status-bar{
+      position:fixed; top:0; left:0; right:0; background:rgba(13,23,42,.98);
+      border-bottom:1px solid rgba(61,88,135,.35); padding:12px 24px; z-index:999;
+      display:flex; justify-content:space-between; align-items:center; backdrop-filter:blur(10px);
     }
-    .onboarding-content h2{ font-size:2em; margin-bottom:20px; color:#7fb3ff; }
-    .onboarding-content p{ font-size:1.1em; line-height:1.8; margin-bottom:30px; color:#c3d6ff; }
-    .onboarding-steps{ text-align:left; margin:30px 0; background:rgba(10,23,45,.6); padding:20px; border-radius:12px;}
-    .onboarding-steps h3{ color:#7fb3ff; margin-bottom:15px; font-size:1.2em; }
-    .onboarding-steps ol{ margin-left:20px; }
-    .onboarding-steps li{ margin:10px 0; color:#d3e4ff; line-height:1.6; }
-    .onboarding-buttons{ display:flex; gap:15px; justify-content:center; margin-top:30px; }
+    .save-status-bar .status-left{ display:flex; align-items:center; gap:16px; }
+    .save-status-bar .status-right{ display:flex; gap:12px; }
+    .save-btn{
+      background:linear-gradient(135deg,#10b981 0%,#059669 100%); color:#fff;
+      border:none; padding:6px 16px; border-radius:6px; font-weight:600; cursor:pointer; transition:.2s;
+    }
+    .save-btn:hover{ transform:translateY(-2px); }
 
-    /* 진행률 표시 */
-    .progress-tracker{ background:rgba(15,27,49,.92); border:1px solid rgba(63,88,135,.4); border-radius:16px; padding:24px; margin-bottom:24px; }
-    .progress-tracker h3{ font-size:1.2em; color:#e3ecff; margin-bottom:20px; display:flex; align-items:center; gap:10px; }
-    .progress-steps{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; }
-    .progress-step{ background:rgba(24,48,88,.6); border:2px solid rgba(63,88,135,.4); border-radius:12px; padding:16px; transition:.3s; }
-    .progress-step.completed{ border-color:var(--success); background:rgba(16,185,129,.15); }
-    .progress-step.in-progress{ border-color:var(--info); background:rgba(59,130,246,.15); }
-    .progress-step-header{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-    .progress-step-icon{ width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9em; }
-    .progress-step.completed .progress-step-icon{ background:var(--success); color:#fff; }
-    .progress-step.in-progress .progress-step-icon{ background:var(--info); color:#fff; }
-    .progress-step:not(.completed):not(.in-progress) .progress-step-icon{ background:rgba(63,88,135,.4); color:#8fa8d9; }
-    .progress-step-title{ font-weight:600; color:#c3d6ff; }
-    .progress-step-desc{ font-size:.85em; color:#9cb5e9; line-height:1.4; }
+    .wizard-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.95); z-index:10000;
+      display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .3s;}
+    .wizard-overlay.active{ opacity:1; pointer-events:all; }
+    .wizard-container{
+      background:linear-gradient(135deg,rgba(19,42,86,.98) 0%,rgba(23,60,109,.98) 100%);
+      border:2px solid rgba(100,145,214,.5); border-radius:20px; padding:40px; max-width:900px; width:90%;
+      box-shadow:0 30px 90px rgba(0,0,0,.8); max-height:90vh; overflow-y:auto;
+    }
+    .wizard-header{ text-align:center; margin-bottom:30px; }
+    .wizard-header h2{ font-size:2em; margin-bottom:10px; color:#7fb3ff; }
+    .wizard-progress{ display:flex; justify-content:space-between; margin:20px 0 30px; }
+    .wizard-step{ flex:1; text-align:center; position:relative; }
+    .wizard-step::before{ content:''; position:absolute; top:15px; left:50%; right:-50%; height:2px; 
+      background:rgba(63,88,135,.4); z-index:-1; }
+    .wizard-step:last-child::before{ display:none; }
+    .wizard-step.completed::before{ background:var(--success); }
+    .wizard-step.active::before{ background:var(--info); }
+    .wizard-step-circle{ width:30px; height:30px; border-radius:50%; margin:0 auto 8px;
+      background:rgba(63,88,135,.4); color:#8fa8d9; display:flex; align-items:center; justify-content:center;
+      font-size:.9em; font-weight:700; }
+    .wizard-step.completed .wizard-step-circle{ background:var(--success); color:#fff; }
+    .wizard-step.active .wizard-step-circle{ background:var(--info); color:#fff; }
+    .wizard-step-label{ font-size:.85em; color:#9cb5e9; }
+    .wizard-content{ background:rgba(10,23,45,.6); padding:30px; border-radius:12px; margin-bottom:20px; }
+    .wizard-buttons{ display:flex; gap:15px; justify-content:flex-end; }
 
-    /* 도움말 툴팁 */
-    .help-icon{ display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%;
-      background:rgba(59,130,246,.3); color:#7fb3ff; font-size:.75em; font-weight:700; cursor:help; margin-left:6px; position:relative;}
-    .help-icon:hover::after{ content:attr(data-tooltip); position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
-      background:rgba(10,20,40,.98); color:#e3ecff; padding:8px 12px; border-radius:8px; font-size:.9rem; white-space:nowrap; z-index:1000;
-      border:1px solid rgba(100,145,214,.5); margin-bottom:8px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+    .tooltip-wrapper{ position:relative; display:inline-block; }
+    .tooltip-icon{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px;
+      border-radius:50%; background:rgba(59,130,246,.3); color:#7fb3ff; font-size:.7em; font-weight:700;
+      cursor:help; margin-left:6px; }
+    .tooltip-text{ visibility:hidden; position:absolute; bottom:125%; left:50%; transform:translateX(-50%);
+      background:rgba(10,20,40,.98); color:#e3ecff; padding:10px 14px; border-radius:8px; font-size:.85rem;
+      white-space:nowrap; z-index:1000; border:1px solid rgba(100,145,214,.5); opacity:0; transition:.3s;
+      box-shadow:0 10px 30px rgba(0,0,0,.5); }
+    .tooltip-icon:hover + .tooltip-text{ visibility:visible; opacity:1; }
 
-    /* 입력 검증 */
-    .field.error input,.field.error select{ border-color:var(--danger); background:rgba(239,68,68,.1); }
-    .field.success input,.field.success select{ border-color:var(--success); }
-    .field-error{ font-size:.8em; color:var(--danger); margin-top:4px; display:none; }
-    .field.error .field-error{ display:block; }
-    .validation-summary{ background:rgba(239,68,68,.15); border:1px solid var(--danger); border-radius:12px; padding:16px; margin-bottom:20px; display:none; }
-    .validation-summary.active{ display:block; }
-    .validation-summary h4{ color:var(--danger); margin-bottom:10px; display:flex; align-items:center; gap:8px; }
-    .validation-summary ul{ list-style:none; margin-left:0; }
-    .validation-summary li{ color:#ffcccb; margin:6px 0; padding-left:20px; position:relative; }
-    .validation-summary li::before{ content:"⚠ "; position:absolute; left:0; }
+    .info-card{ background:linear-gradient(135deg,rgba(59,130,246,.15) 0%,rgba(37,99,235,.15) 100%);
+      border:1px solid rgba(59,130,246,.4); border-radius:12px; padding:16px; margin-bottom:16px; }
+    .info-card-title{ color:#7fb3ff; font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+    .info-card-content{ font-size:.9em; color:#c3d6ff; line-height:1.6; }
 
-    /* 차트/컨테이너/공통 */
-    .chart-container{ background:rgba(15,27,49,.92); border:1px solid rgba(63,88,135,.4); border-radius:16px; padding:28px 32px; margin-bottom:32px; }
-    .chart-wrapper{ position:relative; height:300px; margin-top:20px; }
-
-    .quick-actions{ position:fixed; bottom:30px; right:30px; z-index:1000; display:flex; flex-direction:column; gap:12px; }
-    .quick-action-btn{ width:56px; height:56px; border-radius:50%; border:none; background:linear-gradient(135deg,var(--primary) 0%,var(--primary-light) 100%);
-      color:#fff; font-size:1.5em; cursor:pointer; box-shadow:0 8px 24px rgba(42,99,255,.4); transition:.3s; display:flex; align-items:center; justify-content:center; }
-    .quick-action-btn:hover{ transform:translateY(-3px); box-shadow:0 12px 32px rgba(42,99,255,.6); }
-    .quick-action-btn[data-tooltip]::before{ content:attr(data-tooltip); position:absolute; right:70px; background:rgba(10,20,40,.98); color:#e3ecff;
-      padding:8px 12px; border-radius:8px; white-space:nowrap; font-size:.9em; opacity:0; pointer-events:none; transition:.3s; border:1px solid rgba(100,145,214,.5);}
-    .quick-action-btn:hover::before{ opacity:1; }
-
-    .template-section{ background:linear-gradient(135deg,rgba(16,185,129,.15) 0%,rgba(5,150,105,.15) 100%); border:1px solid rgba(16,185,129,.4); border-radius:12px; padding:20px; margin-bottom:20px; }
-    .template-section h4{ color:var(--success); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
-    .template-buttons{ display:flex; gap:12px; flex-wrap:wrap; }
-
-    .container{ max-width:1680px; margin:0 auto; background:rgba(13,23,42,.92); border-radius:18px; border:1px solid rgba(61,88,135,.35);
-      box-shadow:0 28px 120px rgba(2,8,20,.65); overflow:hidden; }
-    .header{ background:linear-gradient(135deg,rgba(19,42,86,.96) 0%,rgba(23,60,109,.96) 100%); color:#f6f8ff; padding:40px 48px; }
+    .container{ max-width:1680px; margin:60px auto 0; background:rgba(13,23,42,.92); border-radius:18px;
+      border:1px solid rgba(61,88,135,.35); box-shadow:0 28px 120px rgba(2,8,20,.65); overflow:hidden; }
+    .header{ background:linear-gradient(135deg,rgba(19,42,86,.96) 0%,rgba(23,60,109,.96) 100%);
+      color:#f6f8ff; padding:40px 48px; }
     .header h1{ font-size:2.4em; font-weight:700; margin-bottom:12px; }
     .header p{ font-size:1.05em; opacity:.92; line-height:1.7; }
+    .header-actions{ display:flex; gap:12px; margin-top:20px; flex-wrap:wrap; }
 
-    .tabs{ display:flex; border-bottom:1px solid rgba(63,96,149,.45); background:rgba(9,20,42,.85); }
-    .tab{ flex:1; padding:18px; text-align:center; cursor:pointer; border:none; background:transparent; font-weight:600; letter-spacing:-.01em; color:#8fa8d9; transition:.3s; }
+    .tabs{ display:flex; border-bottom:1px solid rgba(63,96,149,.45); background:rgba(9,20,42,.85); overflow-x:auto; }
+    .tab{ padding:18px 20px; text-align:center; cursor:pointer; border:none; background:transparent;
+      font-weight:600; color:#8fa8d9; transition:.3s; white-space:nowrap; }
     .tab:hover{ background:rgba(35,59,107,.45); }
     .tab.active{ background:rgba(16,34,70,.8); color:#7fb3ff; border-bottom:3px solid #7fb3ff; }
 
@@ -112,164 +96,2226 @@
     .tab-content.active{ display:block; }
     @keyframes fadeIn { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
 
-    .section-card{ background:rgba(15,27,49,.92); border:1px solid rgba(63,88,135,.4); border-radius:16px; padding:28px 32px; margin-bottom:32px;
-      box-shadow:0 16px 50px rgba(2,12,32,.6); }
-    .section-header{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:20px; }
+    .section-card{ background:rgba(15,27,49,.92); border:1px solid rgba(63,88,135,.4); border-radius:16px;
+      padding:28px 32px; margin-bottom:32px; box-shadow:0 16px 50px rgba(2,12,32,.6); }
+    .section-header{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
     .section-header h2{ font-size:1.4em; color:#e3ecff; display:flex; align-items:center; gap:10px; }
-    .section-header p{ font-size:.92em; color:#9cb5e9; margin-top:4px; line-height:1.6; }
-    .section-header .description{ flex:1; }
+    .section-desc{ font-size:.92em; color:#9cb5e9; margin-top:4px; line-height:1.6; }
 
-    .guide-card{ background:linear-gradient(135deg,rgba(33,70,133,.65) 0%,rgba(20,49,95,.75) 100%); border:1px solid rgba(100,145,214,.45);
-      border-radius:16px; padding:24px; margin-bottom:32px; }
-    .guide-card h3{ color:#bcd4ff; font-size:1.15em; margin-bottom:12px; }
-    .guide-card ul{ list-style:disc; margin-left:20px; }
-    .guide-card li{ margin:6px 0; line-height:1.6; color:#d3e4ff; }
-
-    .button{ border:none; border-radius:8px; padding:10px 18px; font-weight:600; cursor:pointer; transition:.2s; display:inline-flex; align-items:center; gap:6px; }
+    .button{ border:none; border-radius:8px; padding:10px 18px; font-weight:600; cursor:pointer;
+      transition:.2s; display:inline-flex; align-items:center; gap:6px; font-size:.9em; }
     .button-primary{ background:linear-gradient(135deg,#2a63ff 0%,#5790ff 100%); color:#f5f9ff; }
     .button-secondary{ background:rgba(35,55,96,.85); color:#c3d6ff; }
-    .button-danger{ background:rgba(123,39,63,.85); color:#ffe7f1; }
-    .button-tertiary{ background:rgba(27,42,75,.75); color:#b8c8ec; }
     .button-success{ background:linear-gradient(135deg,var(--success) 0%,#059669 100%); color:#fff; }
+    .button-tertiary{ background:rgba(27,42,75,.75); color:#b8c8ec; }
     .button:hover{ transform:translateY(-2px); box-shadow:0 14px 32px rgba(39,88,188,.45); }
     .button:disabled{ opacity:.5; cursor:not-allowed; transform:none; }
 
+    .field-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); margin-bottom:20px; }
+    .field{ display:flex; flex-direction:column; gap:6px; }
+    .field label{ font-size:.86em; color:#9cb5e9; font-weight:600; display:flex; align-items:center; }
+    .field input, .field select{ width:100%; padding:8px 10px; border:1px solid rgba(78,114,174,.6);
+      border-radius:8px; font-size:.92em; background:rgba(11,24,46,.9); color:#f0f6ff; transition:.3s; }
+    .field input:focus, .field select:focus{ outline:none; border-color:rgba(118,170,255,.9);
+      box-shadow:0 0 0 3px rgba(89,143,231,.35); }
+
+    .metrics-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); }
+    .metric-card{ background:linear-gradient(135deg,rgba(39,77,140,.5) 0%,rgba(24,48,92,.65) 100%);
+      padding:18px 20px; border-radius:14px; }
+    .metric-card h4{ font-size:.9em; color:#b2c6f2; margin-bottom:8px; }
+    .metric-card p{ font-size:1.28em; font-weight:700; color:#f2f6ff; }
+    .metric-card .mini{ font-size:.75em; color:#9cb5e9; display:block; margin-top:4px; }
+
     table{ width:100%; border-collapse:collapse; }
     th,td{ padding:10px 12px; border-bottom:1px solid rgba(63,88,135,.38); text-align:left; font-size:.92em; }
-    th{ background:rgba(31,59,110,.75); color:#f1f6ff; font-weight:600; border-bottom:2px solid rgba(106,142,208,.55); }
+    th{ background:rgba(31,59,110,.75); color:#f1f6ff; font-weight:600; }
     td{ color:#d8e6ff; }
     tr:hover{ background:rgba(24,46,89,.55); }
 
-    input,select,textarea{
-      width:100%; padding:8px 10px; border:1px solid rgba(78,114,174,.6); border-radius:8px; font-size:.92em; background:rgba(11,24,46,.9); color:#f0f6ff;
-      transition:border-color .3s, box-shadow .3s;
-    }
-    input:focus,select:focus,textarea:focus{ outline:none; border-color:rgba(118,170,255,.9); box-shadow:0 0 0 3px rgba(89,143,231,.35); }
-    textarea{ resize:vertical; }
-
-    .field-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); margin-bottom:20px; }
-    .field{ display:flex; flex-direction:column; gap:6px; }
-    .field label{ font-size:.86em; color:#9cb5e9; font-weight:600; display:flex; align-items:center; }
-    .field label .required{ color:var(--danger); margin-left:4px; }
-    .field label.inline{ flex-direction:row; gap:6px; font-size:.85em; }
-
-    .plan-card{ border:1px solid rgba(63,88,135,.4); border-radius:16px; padding:20px 24px; background:rgba(17,34,66,.9); margin-bottom:20px;
-      box-shadow:inset 0 0 0 1px rgba(120,165,255,.08); }
-    .plan-card-header{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:16px; }
-    .plan-card-header h3{ font-size:1.1em; color:#b8d3ff; }
-
-    .sub-table{ margin-top:18px; background:rgba(14,27,51,.9); border:1px solid rgba(63,88,135,.4); border-radius:12px; padding:16px; }
-    .sub-table h4{ font-size:1em; color:#9fc3ff; margin-bottom:12px; }
-
-    .info-badge{ display:inline-flex; align-items:center; gap:6px; background:rgba(46,81,147,.6); color:#d1e2ff; padding:5px 10px; border-radius:999px; font-size:.82em; font-weight:600; }
-    .metrics-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); }
-    .metric-card{ background:linear-gradient(135deg,rgba(39,77,140,.5) 0%,rgba(24,48,92,.65) 100%); padding:18px 20px; border-radius:14px; }
-    .metric-card h4{ font-size:.9em; color:#b2c6f2; margin-bottom:8px; }
-    .metric-card p{ font-size:1.28em; font-weight:700; color:#f2f6ff; }
-
-    .summary-table{ margin-top:16px; border:1px solid rgba(63,88,135,.35); border-radius:12px; overflow:hidden; }
-    .summary-table table tr:nth-child(even){ background:rgba(16,34,70,.6); }
-
-    .pill{ display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px; font-size:.78em; background:rgba(62,96,157,.45); color:#d5e4ff; }
-    .badge-outline{ border:1px solid rgba(120,165,255,.5); padding:5px 10px; border-radius:999px; font-size:.8em; color:#c5d9ff; font-weight:600; }
-    .note{ font-size:.82em; color:#a7bce8; line-height:1.45; }
-    .mini{ font-size:.75em; color:#9cb5e9; }
-    .flex-between{ display:flex; justify-content:space-between; align-items:center; gap:16px; }
-    .hint{ font-size:.8em; color:#9cb5e9; margin-top:4px; }
-    .krw-hint{ font-size:.8em; color:#9cb5e9; margin-top:4px; }
-
-    .report-container{ border:1px solid rgba(88,122,180,.4); border-radius:16px; padding:32px; background:rgba(14,27,52,.92); line-height:1.7; }
-    .report-title{ font-size:1.4em; font-weight:700; color:#e8f1ff; margin-bottom:8px; }
-    .report-subtitle{ font-size:.95em; color:#9fb5e4; margin-bottom:24px; }
+    .chart-container{ position:relative; height:350px; margin:20px 0; }
+    
     .report-section{ margin-bottom:28px; }
-    .report-section h3{ font-size:1.1em; color:#aac4ff; margin-bottom:12px; }
-    .report-kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:16px; }
-    .report-kpi{ background:rgba(24,48,88,.75); border-radius:12px; padding:14px 16px; }
-    .report-kpi span{ display:block; font-size:.82em; color:#8ea9de; margin-bottom:6px; }
-    .report-kpi strong{ font-size:1.28em; color:#f3f7ff; }
+    .report-section h3{ font-size:1.2em; color:#aac4ff; margin-bottom:12px; border-bottom:2px solid rgba(100,145,214,.3); padding-bottom:8px; }
+    .report-kpi{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin:16px 0; }
+    .report-kpi-item{ background:rgba(24,48,88,.75); border-radius:10px; padding:14px; }
+    .report-kpi-label{ display:block; font-size:.82em; color:#8ea9de; margin-bottom:6px; }
+    .report-kpi-value{ font-size:1.3em; color:#f3f7ff; font-weight:700; }
 
-    .empty-placeholder{ border:1px dashed rgba(96,132,196,.5); border-radius:12px; padding:20px; text-align:center; color:#8fa8d9; background:rgba(10,23,45,.9); }
-    .sticky-actions{ display:flex; gap:12px; margin-top:20px; }
+    .quick-actions{ position:fixed; bottom:30px; right:30px; z-index:1000; display:flex; flex-direction:column; gap:12px; }
+    .quick-action-btn{ width:56px; height:56px; border-radius:50%; border:none;
+      background:linear-gradient(135deg,var(--primary) 0%,var(--primary-light) 100%);
+      color:#fff; font-size:1.5em; cursor:pointer; box-shadow:0 8px 24px rgba(42,99,255,.4);
+      transition:.3s; display:flex; align-items:center; justify-content:center; }
+    .quick-action-btn:hover{ transform:translateY(-3px); box-shadow:0 12px 32px rgba(42,99,255,.6); }
 
-    @media (max-width:1100px){
-      .header{ padding:32px 28px; }
-      .content{ padding:28px; }
-      .section-card{ padding:24px; }
-      .plan-card{ padding:18px; }
-    }
-    @media (max-width:820px){
-      body{ padding:16px; }
-      .tabs{ flex-wrap:wrap; }
-      .tab{ flex:1 0 50%; }
-      .content{ padding:22px; }
-      .section-card{ padding:20px; }
-      .field-grid{ grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
-      .quick-actions{ bottom:20px; right:20px; }
+    .toggle-section{ margin:20px 0; }
+    .toggle-header{ display:flex; align-items:center; gap:12px; padding:12px; background:rgba(24,48,88,.6);
+      border-radius:8px; cursor:pointer; transition:.3s; }
+    .toggle-header:hover{ background:rgba(24,48,88,.8); }
+    .toggle-icon{ font-size:1.2em; transition:.3s; }
+    .toggle-section.collapsed .toggle-icon{ transform:rotate(-90deg); }
+    .toggle-content{ margin-top:16px; display:block; }
+    .toggle-section.collapsed .toggle-content{ display:none; }
+
+    .info-badge{ background:rgba(59,130,246,.3); padding:4px 12px; border-radius:999px; font-size:.85em; display:inline-block; }
+
+    @media print {
+      body{ background:#fff; color:#000; }
+      .header, .tabs, .quick-actions, .button, .save-status-bar{ display:none !important; }
+      .container{ box-shadow:none; border:none; margin-top:0; }
+      .section-card{ page-break-inside:avoid; }
     }
   </style>
 </head>
 <body>
-  <!-- 온보딩 오버레이 -->
-  <div class="onboarding-overlay" id="onboardingOverlay">
-    <div class="onboarding-content">
-      <h2>🎓 교육비 예산 수립 가이드</h2>
-      <p>처음 교육비 예산을 수립하시나요?<br/>걱정하지 마세요! 단계별로 안내해드리겠습니다.</p>
-      <div class="onboarding-steps">
-        <h3>📋 작업 순서</h3>
-        <ol>
-          <li><strong>SETTINGS</strong>: 기본 단가와 비율을 설정합니다</li>
-          <li><strong>PLAN ENTRY</strong>: 트랙별 교육 계획을 입력합니다</li>
-          <li><strong>SUMMARY</strong>: 입력한 데이터의 요약을 확인합니다</li>
-          <li><strong>DASHBOARD</strong>: 시각화된 차트와 시뮬레이션을 활용합니다</li>
-          <li><strong>REPORT</strong>: 최종 보고서를 생성하고 출력합니다</li>
-        </ol>
+  <div class="save-status-bar">
+    <div class="status-left">
+      <div style="font-weight:600;color:#7fb3ff;">📊 교육비 예산 수립 v2.2</div>
+      <div id="saveStatus" style="color:#9cb5e9;font-size:.85em;">저장된 데이터 없음</div>
+    </div>
+    <div class="status-right">
+      <button class="save-btn" onclick="manualSave()">💾 저장</button>
+      <button class="button button-secondary" style="padding:6px 16px;font-size:.85em;" onclick="clearAllData()">🗑️ 초기화</button>
+    </div>
+  </div>
+
+  <div class="wizard-overlay" id="wizardOverlay">
+    <div class="wizard-container">
+      <div class="wizard-header">
+        <h2>🎓 교육비 예산 수립 마법사</h2>
+        <p style="color:#c3d6ff;">단 4단계로 전문가처럼 예산을 수립하세요</p>
       </div>
-      <div class="onboarding-buttons">
-        <button class="button button-secondary" onclick="skipOnboarding()">건너뛰기</button>
-        <button class="button button-primary" onclick="startOnboarding()">시작하기</button>
+      
+      <div class="wizard-progress" id="wizardProgress">
+        <div class="wizard-step active" data-step="1">
+          <div class="wizard-step-circle">1</div>
+          <div class="wizard-step-label">기본 정보</div>
+        </div>
+        <div class="wizard-step" data-step="2">
+          <div class="wizard-step-circle">2</div>
+          <div class="wizard-step-label">직원/근무지</div>
+        </div>
+        <div class="wizard-step" data-step="3">
+          <div class="wizard-step-circle">3</div>
+          <div class="wizard-step-label">교육 프로그램</div>
+        </div>
+        <div class="wizard-step" data-step="4">
+          <div class="wizard-step-circle">4</div>
+          <div class="wizard-step-label">완료</div>
+        </div>
+      </div>
+
+      <div class="wizard-content" id="wizardContent"></div>
+
+      <div class="wizard-buttons">
+        <button class="button button-secondary" id="wizardPrev" style="display:none;">← 이전</button>
+        <button class="button button-primary" id="wizardNext">다음 →</button>
+        <button class="button button-success" id="wizardFinish" style="display:none;">완료 ✓</button>
       </div>
     </div>
   </div>
 
   <div class="container">
     <div class="header">
-      <h1>2026년도 교육비 예산 수립 통합 어시스턴트</h1>
-      <p>
-        트랙별 산출 로직과 KPI 지표를 한 화면에서 관리할 수 있는 예산 설계 도구입니다.
-        SETTINGS에서 기본 단가와 가중치를 정리하고 PLAN ENTRY에서 교육 계획을 입력하면
-        SUMMARY · DASHBOARD · REPORT 탭에서 실시간으로 결과를 확인할 수 있습니다.
-      </p>
+      <h1>📊 교육비 예산 수립 어시스턴트</h1>
+      <p>AI 기반 스마트 예산 수립 도구 - 초보자도 10분이면 전문가급 예산안 완성</p>
+      <div class="header-actions">
+        <button class="button button-primary" onclick="showWizard()">🧙 설정 마법사 시작</button>
+        <button class="button button-secondary" onclick="loadSample()">📝 샘플 데이터 불러오기</button>
+        <button class="button button-success" onclick="manualSave()">💾 저장하기</button>
+        <button class="button button-secondary" onclick="exportData()">📥 내보내기</button>
+      </div>
     </div>
 
     <div class="tabs">
-      <button class="tab active" data-target="settings"  onclick="switchTab(event,'settings')">SETTINGS</button>
-      <button class="tab"        data-target="plan"      onclick="switchTab(event,'plan')">PLAN_ENTRY</button>
-      <button class="tab"        data-target="summary"   onclick="switchTab(event,'summary')">SUMMARY</button>
-      <button class="tab"        data-target="dashboard" onclick="switchTab(event,'dashboard')">DASHBOARD</button>
-      <button class="tab"        data-target="report"    onclick="switchTab(event,'report')">REPORT</button>
+      <button class="tab active" onclick="switchTab('quick')">빠른시작</button>
+      <button class="tab" onclick="switchTab('employee')">직원구성</button>
+      <button class="tab" onclick="switchTab('location')">근무지역</button>
+      <button class="tab" onclick="switchTab('plan')">교육계획</button>
+      <button class="tab" onclick="switchTab('summary')">예산요약</button>
+      <button class="tab" onclick="switchTab('dashboard')">대시보드</button>
+      <button class="tab" onclick="switchTab('report')">경영보고서</button>
+      <button class="tab" onclick="switchTab('advanced')">고급설정</button>
     </div>
 
     <div class="content">
-      <!-- 진행률 트래커 -->
-      <div class="progress-tracker" id="progressTracker">
-        <h3>📊 작업 진행률</h3>
-        <div class="progress-steps" id="progressSteps"></div>
-      </div>
-
-      <div id="settings"  class="tab-content active"><div id="settingsContent"></div></div>
-      <div id="plan"      class="tab-content"><div id="planContent"></div></div>
-      <div id="summary"   class="tab-content"><div id="summaryContent"></div></div>
-      <div id="dashboard" class="tab-content"><div id="dashboardContent"></div></div>
-      <div id="report"    class="tab-content"><div id="reportContent"></div></div>
+      <div id="quick" class="tab-content active"></div>
+      <div id="employee" class="tab-content"></div>
+      <div id="location" class="tab-content"></div>
+      <div id="plan" class="tab-content"></div>
+      <div id="summary" class="tab-content"></div>
+      <div id="dashboard" class="tab-content"></div>
+      <div id="report" class="tab-content"></div>
+      <div id="advanced" class="tab-content"></div>
     </div>
   </div>
 
-  <!-- 빠른 액션 버튼 -->
-   <div class="quick-actions">
-    <button class="quick-action-btn" data-tooltip="도움말 보기" onclick="showOnboarding()">?</button>
-    <button class="quick-action-btn" data-tooltip="맨 위로" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+  <div class="quick-actions">
+    <button class="quick-action-btn" onclick="showWizard()" title="설정 마법사">🧙</button>
+    <button class="quick-action-btn" onclick="window.print()" title="인쇄하기">🖨️</button>
+    <button class="quick-action-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="맨 위로">↑</button>
   </div>
 
-  <script src="script.js"></script>
+  <script>
+    // 상태 관리
+    const STORAGE_KEY = 'educationBudgetData_v2';
+    let autoSaveTimer = null;
+
+    const state = {
+      year: new Date().getFullYear() + 1,
+      totalHeadcount: 250,
+      totalBudget: 500000000,
+      previousYearBudget: 450000000, // ⭐ NEW: 전년도 예산 추가
+      leadershipRatio: 15,
+      jobRatio: 45,
+      hierarchyRatio: 15,
+      legalRatio: 25,
+      programs: [],
+      wizardStep: 1,
+      wizardCompleted: false,
+      lastSaved: null,
+      
+      employeeComposition: {
+        junior: 100,
+        senior: 80,
+        manager: 50,
+        executive: 20
+      },
+      
+      locationDistribution: {
+        yeongcheon: { name: '영천', count: 120, customerTrainingCost: 300000 },
+        gyeongsan: { name: '경산', count: 80, customerTrainingCost: 320000 },
+        yesan: { name: '예산', count: 30, customerTrainingCost: 350000 },
+        anyang: { name: '안양', count: 20, customerTrainingCost: 380000 }
+      },
+      
+      jobEducationPolicy: {
+        junior: { 
+          customerTraining: true,
+          externalTraining: true,
+          externalSessions: 2,
+          externalUnitCost: 550000
+        },
+        senior: { 
+          customerTraining: true, 
+          externalTraining: true,
+          externalSessions: 2,
+          externalUnitCost: 600000
+        },
+        manager: { 
+          customerTraining: true, 
+          externalTraining: false,
+          externalSessions: 0,
+          externalUnitCost: 0
+        },
+        executive: { 
+          customerTraining: false,
+          externalTraining: false,
+          externalSessions: 0,
+          externalUnitCost: 0
+        }
+      },
+      
+      hierarchyPrograms: {
+        newEmployee: { name: '신입사원 입문교육', count: 15, unitCost: 500000 },
+        retirement: { name: '정년퇴직 재취업지원', count: 5, unitCost: 300000 }
+      }
+    };
+    
+    // ⭐ NEW: 전략 목표 상수
+    const STRATEGY_GOALS = {
+      digital: '디지털 전환 (DT)',
+      leadership: '핵심인재/리더십',
+      job: '직무 전문성 강화',
+      global: '글로벌 역량',
+      compliance: '법규 준수 (ESG)',
+      culture: '조직 문화',
+      other: '기타'
+    };
+
+    // 자동저장 함수
+    function autoSave() {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      
+      autoSaveTimer = setTimeout(() => {
+        saveToLocalStorage();
+        showSaveNotification('자동 저장됨');
+      }, 2000);
+    }
+
+    function saveToLocalStorage() {
+      try {
+        state.lastSaved = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        updateSaveStatus();
+        return true;
+      } catch (e) {
+        console.error('저장 실패:', e);
+        showSaveNotification('저장 실패', true);
+        return false;
+      }
+    }
+
+    function loadFromLocalStorage() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const data = JSON.parse(saved);
+          // 이전 버전에 없던 값 기본값 할당
+          if (!data.previousYearBudget) data.previousYearBudget = 450000000;
+          if (data.programs && !data.programs[0]?.strategicGoal) {
+            data.programs.forEach((p, i) => {
+              p.strategicGoal = 'other';
+              p.executionQuarter = (i % 4) + 1;
+            });
+          }
+          Object.assign(state, data);
+          updateSaveStatus();
+          return true;
+        }
+      } catch (e) {
+        console.error('불러오기 실패:', e);
+      }
+      return false;
+    }
+
+    function showSaveNotification(message, isError = false) {
+      const existing = document.getElementById('saveNotification');
+      if (existing) existing.remove();
+
+      const notification = document.createElement('div');
+      notification.id = 'saveNotification';
+      notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 30px;
+        background: ${isError ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        z-index: 10001;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      `;
+      notification.innerHTML = `${isError ? '⚠️' : '✅'} ${message}`;
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transition = 'opacity 0.3s';
+        setTimeout(() => notification.remove(), 300);
+      }, 2000);
+    }
+
+    function updateSaveStatus() {
+      const statusEl = document.getElementById('saveStatus');
+      if (statusEl && state.lastSaved) {
+        const savedDate = new Date(state.lastSaved);
+        const now = new Date();
+        const diffMinutes = Math.floor((now - savedDate) / 60000);
+        
+        let timeText;
+        if (diffMinutes < 1) timeText = '방금 전';
+        else if (diffMinutes < 60) timeText = `${diffMinutes}분 전`;
+        else timeText = savedDate.toLocaleTimeString('ko-KR');
+        
+        statusEl.innerHTML = `💾 마지막 저장: ${timeText}`;
+      }
+    }
+
+    function manualSave() {
+      if (saveToLocalStorage()) {
+        showSaveNotification('저장 완료');
+      }
+    }
+
+    // 유틸리티
+    function formatKRW(n) {
+      n = Math.floor(Number(n) || 0);
+      if (n === 0) return '0원';
+      const eok = Math.floor(n / 1e8);
+      const man = Math.floor((n % 1e8) / 1e4);
+      const won = n % 1e4;
+      const parts = [];
+      if (eok > 0) parts.push(`${eok}억`);
+      if (man > 0) parts.push(`${man}만`);
+      if (won > 0) parts.push(`${won}`);
+      return parts.join(' ') + '원';
+    }
+
+    function formatNumber(n) {
+      return Number(n || 0).toLocaleString('ko-KR');
+    }
+
+    // 마법사
+    function showWizard() {
+      state.wizardStep = 1;
+      document.getElementById('wizardOverlay').classList.add('active');
+      renderWizardStep();
+    }
+
+    function renderWizardStep() {
+      const step = state.wizardStep;
+      const content = document.getElementById('wizardContent');
+      const prev = document.getElementById('wizardPrev');
+      const next = document.getElementById('wizardNext');
+      const finish = document.getElementById('wizardFinish');
+
+      document.querySelectorAll('.wizard-step').forEach((el, i) => {
+        el.classList.remove('active', 'completed');
+        if (i + 1 < step) el.classList.add('completed');
+        if (i + 1 === step) el.classList.add('active');
+      });
+
+      prev.style.display = step > 1 ? 'block' : 'none';
+      next.style.display = step < 4 ? 'block' : 'none';
+      finish.style.display = step === 4 ? 'block' : 'none';
+
+      if (step === 1) {
+        content.innerHTML = `
+          <div class="info-card">
+            <div class="info-card-title">💡 교육비 예산의 기본</div>
+            <div class="info-card-content">
+              기업 교육비는 일반적으로 <strong>총 인건비의 1.5~3%</strong> 수준입니다.
+              법정의무교육은 <strong>인당 연간 8~15만원</strong>, 직무교육은 <strong>인당 50~100만원</strong>이 평균입니다.
+            </div>
+          </div>
+          <div class="field-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="field">
+              <label>예산 연도
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">수립할 교육비 예산의 연도를 선택하세요</span>
+                </span>
+              </label>
+              <input type="number" value="${state.year}" onchange="state.year=+this.value" min="2024" max="2030">
+            </div>
+            <div class="field">
+              <label>전체 임직원 수
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">교육 대상 전체 인원입니다</span>
+                </span>
+              </label>
+              <input type="number" value="${state.totalHeadcount}" onchange="state.totalHeadcount=+this.value;updateBudgetEstimate()" min="1">
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label>
+                ⭐ (신규) 전년도 총 예산 (원)
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">YoY 비교를 위해 전년도 예산을 입력</span>
+                </span>
+              </label>
+              <input type="text" value="${formatNumber(state.previousYearBudget)}" 
+                onchange="state.previousYearBudget=Number(this.value.replace(/,/g,''))||0;this.value=formatNumber(state.previousYearBudget);">
+              <div style="font-size:.85em;color:#9cb5e9;margin-top:4px;">${formatKRW(state.previousYearBudget)}</div>
+            </div>
+            <div class="field">
+              <label>올해 희망 총 예산 (원)
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">확보 가능한 총 교육비 예산입니다</span>
+                </span>
+              </label>
+              <input type="text" value="${formatNumber(state.totalBudget)}" 
+                onchange="state.totalBudget=Number(this.value.replace(/,/g,''))||0;this.value=formatNumber(state.totalBudget);updateBudgetEstimate()">
+              <div style="font-size:.85em;color:#9cb5e9;margin-top:4px;">${formatKRW(state.totalBudget)}</div>
+            </div>
+          </div>
+        `;
+      } else if (step === 2) {
+        // ... (step 2 코드는 변경 없음) ...
+        const comp = state.employeeComposition;
+        const locations = state.locationDistribution;
+        const totalLocationCount = Object.values(locations).reduce((sum, loc) => sum + loc.count, 0);
+        
+        content.innerHTML = `
+          <div class="info-card">
+            <div class="info-card-title">👥 직원 구성 및 근무지 설정</div>
+            <div class="info-card-content">
+              직급별 인원과 근무지별 인원을 입력하세요. <strong>주임/선임</strong>은 고객사 교육 + 외부 교육 대상입니다.
+            </div>
+          </div>
+          
+          <h4 style="color:#7fb3ff;margin:20px 0 12px;">📊 직급별 인원</h4>
+          <div class="field-grid">
+            <div class="field">
+              <label>주임 ⭐
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">고객사 + 외부 교육 가능 (연 2회)</span>
+                </span>
+              </label>
+              <input type="number" value="${comp.junior}" 
+                onchange="state.employeeComposition.junior=+this.value;updateTotalHeadcount();renderWizardStep()" min="0">
+            </div>
+            <div class="field">
+              <label>선임 ⭐⭐
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">고객사 + 외부 교육 가능 (연 2회)</span>
+                </span>
+              </label>
+              <input type="number" value="${comp.senior}" 
+                onchange="state.employeeComposition.senior=+this.value;updateTotalHeadcount();renderWizardStep()" min="0">
+            </div>
+            <div class="field">
+              <label>책임
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">고객사 교육만 수강</span>
+                </span>
+              </label>
+              <input type="number" value="${comp.manager}" 
+                onchange="state.employeeComposition.manager=+this.value;updateTotalHeadcount();renderWizardStep()" min="0">
+            </div>
+            <div class="field">
+              <label>임원
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">리더십 교육 대상</span>
+                </span>
+              </label>
+              <input type="number" value="${comp.executive}" 
+                onchange="state.employeeComposition.executive=+this.value;updateTotalHeadcount();renderWizardStep()" min="0">
+            </div>
+          </div>
+          
+          <h4 style="color:#7fb3ff;margin:24px 0 12px;">🏢 근무지별 인원 및 고객사 교육 단가</h4>
+          <div class="info-card" style="margin-bottom:16px;background:linear-gradient(135deg,rgba(251,191,36,.15) 0%,rgba(245,158,11,.15) 100%);border-color:rgba(251,191,36,.4);">
+            <div class="info-card-title" style="color:#fbbf24;">💡 중요: 근무지별 설정</div>
+            <div class="info-card-content">
+              각 근무지에서 진행하는 <strong>고객사 교육 단가가 다릅니다</strong>. 지역별 인원과 단가를 정확히 입력하세요.<br>
+              <strong>근무지별 인원 합계(${totalLocationCount}명)</strong>가 전체 인원(${state.totalHeadcount}명)과 일치해야 합니다.
+            </div>
+          </div>
+          
+          <table style="margin-top:12px;">
+            <thead>
+              <tr>
+                <th>근무지역</th>
+                <th>인원 (명)</th>
+                <th>고객사 교육 단가 (원)</th>
+                <th>지역별 예산</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(locations).map(([key, loc]) => {
+                const locationBudget = loc.count * loc.customerTrainingCost;
+                return `
+                  <tr>
+                    <td><strong>${loc.name}</strong></td>
+                    <td><input type="number" value="${loc.count}" onchange="updateLocationInWizard('${key}','count',+this.value)" style="width:100px;" min="0"></td>
+                    <td>
+                      <input type="text" value="${formatNumber(loc.customerTrainingCost)}" 
+                        onchange="updateLocationInWizard('${key}','customerTrainingCost',Number(this.value.replace(/,/g,'')))" 
+                        style="width:140px;">
+                    </td>
+                    <td><strong>${formatKRW(locationBudget)}</strong></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            <tfoot style="background:rgba(31,59,110,.9);">
+              <tr>
+                <th>합계</th>
+                <th>${formatNumber(totalLocationCount)}명</th>
+                <th></th>
+                <th><strong>${formatKRW(Object.values(locations).reduce((sum, loc) => sum + loc.count * loc.customerTrainingCost, 0))}</strong></th>
+              </tr>
+            </tfoot>
+          </table>
+          
+          ${totalLocationCount !== state.totalHeadcount ? `
+          <div class="info-card" style="margin-top:16px;background:linear-gradient(135deg,rgba(239,68,68,.15) 0%,rgba(220,38,38,.15) 100%);border-color:rgba(239,68,68,.4);">
+            <div class="info-card-title" style="color:#ef4444;">⚠️ 인원 불일치</div>
+            <div class="info-card-content">
+              근무지별 인원 합계(${formatNumber(totalLocationCount)}명)가 전체 인원(${formatNumber(state.totalHeadcount)}명)과 다릅니다.<br>
+              <strong>반드시 일치시켜야 다음 단계로 진행할 수 있습니다.</strong>
+            </div>
+          </div>
+          ` : ''}
+        `;
+      } else if (step === 3) {
+        // ... (step 3 코드는 변경 없음) ...
+        content.innerHTML = `
+          <div class="info-card">
+            <div class="info-card-title">📚 주요 교육 프로그램 설정</div>
+            <div class="info-card-content">
+              회사에서 실시할 주요 교육 과정을 입력하세요. 나중에 추가/수정 가능합니다.
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label>리더십 교육 비중 (%)
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">임원/책임 대상 리더십 교육 비중</span>
+                </span>
+              </label>
+              <input type="number" value="${state.leadershipRatio}" onchange="state.leadershipRatio=+this.value" min="0" max="100">
+            </div>
+            <div class="field">
+              <label>직무교육 비중 (%)
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">고객사 교육 + 외부 전문교육</span>
+                </span>
+              </label>
+              <input type="number" value="${state.jobRatio}" onchange="state.jobRatio=+this.value" min="0" max="100">
+            </div>
+            <div class="field">
+              <label>계층별 교육 비중 (%)
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">신입사원, 정년퇴직자 등 특정 계층 교육</span>
+                </span>
+              </label>
+              <input type="number" value="${state.hierarchyRatio}" onchange="state.hierarchyRatio=+this.value" min="0" max="100">
+            </div>
+            <div class="field">
+              <label>법정의무교육 비중 (%)
+                <span class="tooltip-wrapper">
+                  <span class="tooltip-icon">?</span>
+                  <span class="tooltip-text">산업안전, 성희롱예방 등 필수 교육 비중</span>
+                </span>
+              </label>
+              <input type="number" value="${state.legalRatio}" onchange="state.legalRatio=+this.value" min="0" max="100">
+            </div>
+          </div>
+          <div class="info-card" style="margin-top:20px;background:linear-gradient(135deg,rgba(16,185,129,.15) 0%,rgba(5,150,105,.15) 100%);border-color:rgba(16,185,129,.4);">
+            <div class="info-card-title" style="color:var(--success);">✅ 업계 표준 프로그램 자동 추가</div>
+            <div class="info-card-content">
+              ✓ <strong>리더십</strong>: 임원/책임 워크샵<br>
+              ✓ <strong>직무</strong>: 고객사 교육(지역별), 외부 전문교육(주임/선임)<br>
+              ✓ <strong>계층</strong>: 신입사원 입문교육, 정년퇴직 재취업지원<br>
+              ✓ <strong>법정</strong>: 산업안전, 직장 내 괴롭힘 예방 등
+            </div>
+          </div>
+        `;
+      } else if (step === 4) {
+        // ... (step 4 코드는 변경 없음) ...
+        const leadership = Math.floor(state.totalBudget * state.leadershipRatio / 100);
+        const job = Math.floor(state.totalBudget * state.jobRatio / 100);
+        const legal = Math.floor(state.totalBudget * state.legalRatio / 100);
+        const jobBudget = calculateJobEducationBudget();
+        
+        content.innerHTML = `
+          <div class="info-card" style="background:linear-gradient(135deg,rgba(16,185,129,.2) 0%,rgba(5,150,105,.2) 100%);border-color:rgba(16,185,129,.6);">
+            <div class="info-card-title" style="color:#10b981;font-size:1.1em;">🎉 설정 완료!</div>
+            <div class="info-card-content">
+              ${state.year}년도 교육비 예산이 준비되었습니다.
+            </div>
+          </div>
+          <div class="metrics-grid" style="margin-top:20px;">
+            <div class="metric-card">
+              <h4>총 예산</h4>
+              <p>${formatNumber(state.totalBudget)}원</p>
+              <span class="mini">${formatKRW(state.totalBudget)}</span>
+            </div>
+            <div class="metric-card">
+              <h4>대상 인원</h4>
+              <p>${formatNumber(state.totalHeadcount)}명</p>
+              <span class="mini">1인당 ${formatKRW(Math.floor(state.totalBudget/state.totalHeadcount))}</span>
+            </div>
+            <div class="metric-card">
+              <h4>리더십 교육</h4>
+              <p>${formatNumber(leadership)}원</p>
+              <span class="mini">${state.leadershipRatio}% 배분</span>
+            </div>
+            <div class="metric-card">
+              <h4>직무 교육</h4>
+              <p>${formatNumber(job)}원</p>
+              <span class="mini">${state.jobRatio}% 배분</span>
+            </div>
+            <div class="metric-card">
+              <h4>법정의무 교육</h4>
+              <p>${formatNumber(legal)}원</p>
+              <span class="mini">${state.legalRatio}% 배분</span>
+            </div>
+          </div>
+          
+          <div class="section-card" style="margin-top:24px;background:rgba(59,130,246,.1);">
+            <h3 style="color:#7fb3ff;margin-bottom:16px;">🏢 근무지별 직무교육비 배부 예상</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>근무지역</th>
+                  <th>인원</th>
+                  <th>고객사 교육비</th>
+                  <th>비중</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${jobBudget.byLocation.map(loc => {
+                  const ratio = jobBudget.customer > 0 ? ((loc.total / jobBudget.customer) * 100).toFixed(1) : 0;
+                  return `
+                    <tr>
+                      <td><strong>${loc.name}</strong></td>
+                      <td>${formatNumber(loc.count)}명</td>
+                      <td style="color:#10b981;font-weight:700;font-size:1.05em;">${formatKRW(loc.total)}</td>
+                      <td>${ratio}%</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+              <tfoot style="background:rgba(31,59,110,.9);">
+                <tr>
+                  <th>고객사 교육 합계</th>
+                  <th>${formatNumber(Object.values(state.locationDistribution).reduce((sum, loc) => sum + loc.count, 0))}명</th>
+                  <th style="color:#10b981;"><strong>${formatKRW(jobBudget.customer)}</strong></th>
+                  <th>100%</th>
+                </tr>
+              </tfoot>
+            </table>
+            <div style="margin-top:16px;padding:12px;background:rgba(10,23,45,.6);border-radius:8px;">
+              <div style="display:grid;gap:8px;">
+                <div>💡 <strong>고객사 교육비:</strong> ${formatKRW(jobBudget.customer)}</div>
+                <div>🎓 <strong>외부 전문교육비:</strong> ${formatKRW(jobBudget.external)} (주임 ${state.employeeComposition.junior}명 + 선임 ${state.employeeComposition.senior}명)</div>
+                <div style="color:#7fb3ff;">📊 <strong>직무교육 총계:</strong> ${formatKRW(jobBudget.total)}</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="info-card" style="margin-top:20px;">
+            <div class="info-card-title">📌 다음 단계</div>
+            <div class="info-card-content">
+              1. <strong>교육계획</strong> 탭에서 세부 프로그램을 입력하세요<br>
+              2. <strong>예산요약</strong>에서 배분 현황을 확인하세요<br>
+              3. <strong>경영보고서</strong>를 생성하여 경영진께 보고하세요
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function updateLocationInWizard(key, field, value) {
+      state.locationDistribution[key][field] = Math.max(0, value);
+      renderWizardStep();
+    }
+
+    function updateBudgetEstimate() {
+      const el = document.getElementById('budgetEstimate');
+      if (el) {
+        const perPerson = Math.floor(state.totalBudget / state.totalHeadcount);
+        const jobBudget = calculateJobEducationBudget();
+        
+        el.innerHTML = `
+          총 인원: <strong>${state.totalHeadcount}명</strong><br>
+          인당 연간 교육비: <strong>${formatKRW(perPerson)}</strong><br>
+          <hr style="margin:8px 0;border:none;border-top:1px solid rgba(100,145,214,.3);">
+          리더십 교육 (15%): <strong>${formatKRW(Math.floor(state.totalBudget * 0.15))}</strong><br>
+          직무 교육 (60%): <strong>${formatKRW(Math.floor(state.totalBudget * 0.60))}</strong><br>
+          법정의무 교육 (25%): <strong>${formatKRW(Math.floor(state.totalBudget * 0.25))}</strong>
+        `;
+      }
+    }
+
+    function updateTotalHeadcount() {
+      state.totalHeadcount = state.employeeComposition.junior + 
+                            state.employeeComposition.senior + 
+                            state.employeeComposition.manager + 
+                            state.employeeComposition.executive;
+    }
+
+    function calculateJobEducationBudget() {
+      const policy = state.jobEducationPolicy;
+      const comp = state.employeeComposition;
+      const locations = state.locationDistribution;
+      
+      let customerBudget = 0;
+      Object.values(locations).forEach(loc => {
+        customerBudget += loc.count * loc.customerTrainingCost;
+      });
+      
+      const externalBudget = 
+        comp.junior * policy.junior.externalSessions * policy.junior.externalUnitCost +
+        comp.senior * policy.senior.externalSessions * policy.senior.externalUnitCost;
+      
+      return {
+        customer: customerBudget,
+        external: externalBudget,
+        total: customerBudget + externalBudget,
+        byLocation: Object.entries(locations).map(([key, loc]) => ({
+          name: loc.name,
+          count: loc.count,
+          unitCost: loc.customerTrainingCost,
+          total: loc.count * loc.customerTrainingCost
+        }))
+      };
+    }
+
+    document.getElementById('wizardPrev')?.addEventListener('click', () => {
+      if (state.wizardStep > 1) {
+        state.wizardStep--;
+        renderWizardStep();
+      }
+    });
+
+    document.getElementById('wizardNext')?.addEventListener('click', () => {
+      if (state.wizardStep === 2) {
+        const totalLocationCount = Object.values(state.locationDistribution).reduce((sum, loc) => sum + loc.count, 0);
+        if (totalLocationCount !== state.totalHeadcount) {
+          alert(`⚠️ 근무지별 인원 합계(${totalLocationCount}명)가 전체 인원(${state.totalHeadcount}명)과 일치하지 않습니다.\n\n근무지별 인원을 조정해주세요.`);
+          return;
+        }
+      }
+      
+      if (state.wizardStep < 4) {
+        state.wizardStep++;
+        renderWizardStep();
+      }
+    });
+
+    document.getElementById('wizardFinish')?.addEventListener('click', () => {
+      state.wizardCompleted = true;
+      document.getElementById('wizardOverlay').classList.remove('active');
+      initializeWithWizardData();
+      switchTab('plan');
+    });
+
+    function initializeWithWizardData() {
+      const jobBudget = calculateJobEducationBudget();
+      const comp = state.employeeComposition;
+      const hier = state.hierarchyPrograms;
+      
+      state.programs = [
+        {
+          id: 1,
+          category: 'leadership',
+          name: '임원 리더십 워크샵',
+          headcount: comp.executive,
+          rounds: 2,
+          unitCost: 800000,
+          description: '전략적 의사결정 및 조직 관리',
+          executionQuarter: 2, // ⭐ NEW
+          strategicGoal: 'leadership' // ⭐ NEW
+        },
+        {
+          id: 2,
+          category: 'leadership',
+          name: '책임급 리더십 과정',
+          headcount: comp.manager,
+          rounds: 2,
+          unitCost: 600000,
+          description: '팀 빌딩 및 코칭 스킬',
+          executionQuarter: 3, // ⭐ NEW
+          strategicGoal: 'leadership' // ⭐ NEW
+        },
+        {
+          id: 3,
+          category: 'job',
+          name: '고객사 직무교육 (지역별)',
+          headcount: comp.junior + comp.senior + comp.manager,
+          rounds: 1,
+          unitCost: Math.floor(jobBudget.customer / (comp.junior + comp.senior + comp.manager || 1)),
+          description: '영천/경산/예산/안양 지역별 고객사 교육',
+          isCustomerTraining: true,
+          executionQuarter: 1, // ⭐ NEW
+          strategicGoal: 'job' // ⭐ NEW
+        },
+        {
+          id: 4,
+          category: 'job',
+          name: '외부 전문교육 (주임/선임)',
+          headcount: comp.junior + comp.senior,
+          rounds: 2,
+          unitCost: Math.floor(jobBudget.external / ((comp.junior + comp.senior) * 2 || 1)),
+          description: '외부 전문기관 교육 (주임/선임 역량 강화)',
+          isExternalTraining: true,
+          executionQuarter: 2, // ⭐ NEW
+          strategicGoal: 'digital' // ⭐ NEW
+        },
+        {
+          id: 5,
+          category: 'hierarchy',
+          name: hier.newEmployee.name,
+          headcount: hier.newEmployee.count,
+          rounds: 1,
+          unitCost: hier.newEmployee.unitCost,
+          description: '신규 입사자 대상 회사 소개 및 직무 기초',
+          executionQuarter: 1, // ⭐ NEW
+          strategicGoal: 'culture' // ⭐ NEW
+        },
+        {
+          id: 6,
+          category: 'hierarchy',
+          name: hier.retirement.name,
+          headcount: hier.retirement.count,
+          rounds: 1,
+          unitCost: hier.retirement.unitCost,
+          description: '정년퇴직 예정자 대상 제2의 인생 설계',
+          executionQuarter: 4, // ⭐ NEW
+          strategicGoal: 'culture' // ⭐ NEW
+        },
+        {
+          id: 7,
+          category: 'legal',
+          name: '산업안전보건교육',
+          headcount: state.totalHeadcount,
+          rounds: 1,
+          unitCost: 80000,
+          description: '법정의무 연간 8시간',
+          executionQuarter: 1, // ⭐ NEW
+          strategicGoal: 'compliance' // ⭐ NEW
+        },
+        {
+          id: 8,
+          category: 'legal',
+          name: '직장 내 괴롭힘 예방',
+          headcount: state.totalHeadcount,
+          rounds: 1,
+          unitCost: 50000,
+          description: '법정의무 연간 1시간',
+          executionQuarter: 2, // ⭐ NEW
+          strategicGoal: 'compliance' // ⭐ NEW
+        }
+      ];
+      renderAllTabs();
+      autoSave();
+    }
+
+    // 탭 전환
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event?.currentTarget?.classList.add('active');
+      
+      const targetTab = Array.from(document.querySelectorAll('.tab')).find(t => 
+        t.textContent.includes(tabName === 'quick' ? '빠른시작' : 
+                              tabName === 'employee' ? '직원구성' :
+                              tabName === 'location' ? '근무지역' :
+                              tabName === 'plan' ? '교육계획' :
+                              tabName === 'summary' ? '예산요약' :
+                              tabName === 'dashboard' ? '대시보드' :
+                              tabName === 'report' ? '경영보고서' : '고급설정')
+      );
+      if (targetTab) targetTab.classList.add('active');
+      
+      document.getElementById(tabName)?.classList.add('active');
+      
+      if (tabName === 'quick') renderQuickStart();
+      if (tabName === 'employee') renderEmployee();
+      if (tabName === 'location') renderLocation();
+      if (tabName === 'plan') renderPlan();
+      if (tabName === 'summary') renderSummary();
+      if (tabName === 'dashboard') renderDashboard();
+      if (tabName === 'report') renderReport();
+      if (tabName === 'advanced') renderAdvanced();
+    }
+
+    // 근무지역 관리
+    function renderLocation() {
+      // ... (코드는 변경 없음) ...
+      const el = document.getElementById('location');
+      if (!el) return;
+
+      const locations = state.locationDistribution;
+      const totalLocationCount = Object.values(locations).reduce((sum, loc) => sum + loc.count, 0);
+      const jobBudget = calculateJobEducationBudget();
+
+      el.innerHTML = `
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2>🏢 근무지역별 관리</h2>
+              <div class="section-desc">지역별 인원과 고객사 교육비를 관리합니다</div>
+            </div>
+          </div>
+
+          <div class="info-card">
+            <div class="info-card-title">📍 근무지역별 고객사 교육</div>
+            <div class="info-card-content">
+              각 지역에서 진행되는 고객사 직무교육의 단가가 다릅니다.<br>
+              지역별 인원과 단가를 설정하면 자동으로 예산이 계산됩니다.
+            </div>
+          </div>
+
+          <div class="metrics-grid" style="margin-top:24px;">
+            ${Object.entries(locations).map(([key, loc]) => `
+              <div class="metric-card" style="background:linear-gradient(135deg,rgba(59,130,246,.3) 0%,rgba(29,78,216,.3) 100%);">
+                <h4>📍 ${loc.name}</h4>
+                <p>${formatNumber(loc.count)}명</p>
+                <span class="mini">단가: ${formatKRW(loc.customerTrainingCost)}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="section-card" style="margin-top:32px;background:rgba(16,185,129,.1);">
+            <h3 style="color:var(--success);margin-bottom:16px;">💰 팀별 배부 예상 금액</h3>
+            <div class="info-card" style="margin-bottom:16px;">
+              <div class="info-card-title">📊 지역별 교육비 분석</div>
+              <div class="info-card-content">
+                각 근무지(팀)에 배부될 고객사 교육비를 미리 확인할 수 있습니다.<br>
+                실제 배부 시 이 금액을 기준으로 팀별 교육 운영이 가능합니다.
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>지역</th>
+                  <th>인원</th>
+                  <th>단가</th>
+                  <th>배부 예상액</th>
+                  <th>전체 대비 비중</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${jobBudget.byLocation.map(loc => {
+                  const ratio = jobBudget.customer > 0 ? ((loc.total / jobBudget.customer) * 100).toFixed(1) : 0;
+                  return `
+                    <tr>
+                      <td><strong>🏢 ${loc.name}</strong></td>
+                      <td>${formatNumber(loc.count)}명</td>
+                      <td>${formatKRW(loc.unitCost)}</td>
+                      <td style="color:#10b981;font-weight:700;font-size:1.05em;">${formatKRW(loc.total)}</td>
+                      <td>${ratio}%</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+              <tfoot style="background:rgba(31,59,110,.9);">
+                <tr>
+                  <th colspan="2">고객사 교육 합계</th>
+                  <th></th>
+                  <th style="color:#10b981;"><strong>${formatKRW(jobBudget.customer)}</strong></th>
+                  <th>100%</th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function updateLocation(key, field, value) {
+      state.locationDistribution[key][field] = Math.max(0, value);
+      autoSave();
+      renderLocation();
+      renderSummary();
+    }
+
+    // 직원 구성 관리
+    function renderEmployee() {
+      // ... (코드는 변경 없음) ...
+      const el = document.getElementById('employee');
+      if (!el) return;
+
+      const comp = state.employeeComposition;
+      const policy = state.jobEducationPolicy;
+      const jobBudget = calculateJobEducationBudget();
+
+      el.innerHTML = `
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2>👥 직원 구성 관리</h2>
+              <div class="section-desc">직급별 인원과 교육 정책을 관리합니다</div>
+            </div>
+          </div>
+
+          <div class="info-card">
+            <div class="info-card-title">📋 직급별 교육 정책</div>
+            <div class="info-card-content">
+              <strong>주임/선임</strong>은 고객사 교육 + 외부 전문교육 대상입니다 (연 2회).<br>
+              <strong>책임</strong>은 고객사 교육만 수강합니다.<br>
+              <strong>임원</strong>은 리더십 교육 대상입니다.
+            </div>
+          </div>
+
+          <div class="metrics-grid" style="margin-top:24px;">
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(251,191,36,.3) 0%,rgba(245,158,11,.3) 100%);">
+              <h4>⭐ 주임</h4>
+              <p>${formatNumber(comp.junior)}명</p>
+              <span class="mini">고객사 + 외부 교육</span>
+            </div>
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(139,92,246,.3) 0%,rgba(109,40,217,.3) 100%);">
+              <h4>⭐⭐ 선임</h4>
+              <p>${formatNumber(comp.senior)}명</p>
+              <span class="mini">고객사 + 외부 교육</span>
+            </div>
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(59,130,246,.3) 0%,rgba(29,78,216,.3) 100%);">
+              <h4>👔 책임</h4>
+              <p>${formatNumber(comp.manager)}명</p>
+              <span class="mini">고객사 교육만</span>
+            </div>
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(16,185,129,.3) 0%,rgba(5,150,105,.3) 100%);">
+              <h4>💼 임원</h4>
+              <p>${formatNumber(comp.executive)}명</p>
+              <span class="mini">리더십 교육</span>
+            </div>
+          </div>
+
+          <div class="section-card" style="margin-top:32px;background:rgba(24,48,88,.6);">
+            <h3 style="color:#7fb3ff;margin-bottom:16px;">📊 직급별 인원 설정</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>직급</th>
+                  <th>인원</th>
+                  <th>고객사 교육</th>
+                  <th>외부 교육 횟수</th>
+                  <th>외부 교육 단가</th>
+                  <th>예상 예산</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background:rgba(251,191,36,.1);">
+                  <td><strong>주임 ⭐</strong></td>
+                  <td><input type="number" value="${comp.junior}" onchange="updateEmployeeCount('junior',+this.value)" style="width:80px;" min="0"></td>
+                  <td>✓</td>
+                  <td><input type="number" value="${policy.junior.externalSessions}" onchange="updatePolicy('junior','externalSessions',+this.value)" style="width:60px;" min="0"></td>
+                  <td><input type="text" value="${formatNumber(policy.junior.externalUnitCost)}" onchange="updatePolicy('junior','externalUnitCost',Number(this.value.replace(/,/g,'')))" style="width:100px;"></td>
+                  <td><strong>${formatKRW(comp.junior * policy.junior.externalSessions * policy.junior.externalUnitCost)}</strong></td>
+                </tr>
+                <tr style="background:rgba(139,92,246,.1);">
+                  <td><strong>선임 ⭐⭐</strong></td>
+                  <td><input type="number" value="${comp.senior}" onchange="updateEmployeeCount('senior',+this.value)" style="width:80px;" min="0"></td>
+                  <td>✓</td>
+                  <td><input type="number" value="${policy.senior.externalSessions}" onchange="updatePolicy('senior','externalSessions',+this.value)" style="width:60px;" min="0"></td>
+                  <td><input type="text" value="${formatNumber(policy.senior.externalUnitCost)}" onchange="updatePolicy('senior','externalUnitCost',Number(this.value.replace(/,/g,'')))" style="width:100px;"></td>
+                  <td><strong>${formatKRW(comp.senior * policy.senior.externalSessions * policy.senior.externalUnitCost)}</strong></td>
+                </tr>
+                <tr>
+                  <td><strong>책임</strong></td>
+                  <td><input type="number" value="${comp.manager}" onchange="updateEmployeeCount('manager',+this.value)" style="width:80px;" min="0"></td>
+                  <td>✓</td>
+                  <td>-</td>
+                  <td>-</td>
+                  <td><strong>고객사 교육만</strong></td>
+                </tr>
+                <tr>
+                  <td><strong>임원</strong></td>
+                  <td><input type="number" value="${comp.executive}" onchange="updateEmployeeCount('executive',+this.value)" style="width:80px;" min="0"></td>
+                  <td>-</td>
+                  <td>-</td>
+                  <td>-</td>
+                  <td><strong>리더십 교육 별도</strong></td>
+                </tr>
+              </tbody>
+              <tfoot style="background:rgba(31,59,110,.9);">
+                <tr>
+                  <th>합계</th>
+                  <th>${formatNumber(state.totalHeadcount)}명</th>
+                  <th colspan="3"></th>
+                  <th><strong>${formatKRW(jobBudget.external)}</strong></th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="section-card" style="margin-top:32px;background:rgba(16,185,129,.1);">
+            <h3 style="color:var(--success);margin-bottom:16px;">💰 직무교육비 자동 계산</h3>
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <h4>🏢 고객사 교육</h4>
+                <p>${formatKRW(jobBudget.customer)}</p>
+                <span class="mini">주임/선임/책임 대상</span>
+              </div>
+              <div class="metric-card">
+                <h4>🎓 외부 전문교육</h4>
+                <p>${formatKRW(jobBudget.external)}</p>
+                <span class="mini">주임 ${comp.junior}명 + 선임 ${comp.senior}명</span>
+              </div>
+              <div class="metric-card" style="background:linear-gradient(135deg,rgba(16,185,129,.4) 0%,rgba(5,150,105,.4) 100%);">
+                <h4>💼 직무교육 총계</h4>
+                <p>${formatKRW(jobBudget.total)}</p>
+                <span class="mini">1인당 평균 ${formatKRW(Math.floor(jobBudget.total / (comp.junior + comp.senior + comp.manager || 1)))}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function updateEmployeeCount(rank, count) {
+      state.employeeComposition[rank] = Math.max(0, count);
+      updateTotalHeadcount();
+      autoSave();
+      renderEmployee();
+      renderSummary();
+    }
+
+    function updatePolicy(rank, field, value) {
+      state.jobEducationPolicy[rank][field] = Math.max(0, value);
+      autoSave();
+      renderEmployee();
+      renderSummary();
+    }
+
+    // 빠른 시작
+    function renderQuickStart() {
+      // ... (코드는 변경 없음) ...
+      const el = document.getElementById('quick');
+      if (!el) return;
+      
+      const total = calculateTotal();
+      const isSetup = state.wizardCompleted;
+      
+      el.innerHTML = `
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2>🚀 빠른 시작 가이드</h2>
+              <div class="section-desc">4단계로 완성하는 교육비 예산</div>
+            </div>
+          </div>
+          
+          ${!isSetup ? `
+          <div class="info-card" style="background:linear-gradient(135deg,rgba(251,191,36,.15) 0%,rgba(245,158,11,.15) 100%);border-color:rgba(251,191,36,.4);">
+            <div class="info-card-title" style="color:#fbbf24;">⚡ 아직 설정이 완료되지 않았습니다</div>
+            <div class="info-card-content">
+              <strong>설정 마법사</strong>를 실행하여 기본 정보를 입력하세요. 5분이면 충분합니다!
+            </div>
+          </div>
+          <button class="button button-primary" onclick="showWizard()" style="margin-top:16px;">
+            🧙 설정 마법사 시작하기
+          </button>
+          ` : `
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <h4>📅 예산 연도</h4>
+              <p>${state.year}년</p>
+            </div>
+            <div class="metric-card">
+              <h4>👥 대상 인원</h4>
+              <p>${formatNumber(state.totalHeadcount)}명</p>
+            </div>
+            <div class="metric-card">
+              <h4>💰 총 예산</h4>
+              <p>${formatNumber(total)}원</p>
+              <span class="mini">${formatKRW(total)}</span>
+            </div>
+            <div class="metric-card">
+              <h4>📚 프로그램 수</h4>
+              <p>${state.programs.length}개</p>
+            </div>
+          </div>
+          `}
+          
+          <div class="section-card" style="margin-top:24px;background:rgba(24,48,88,.6);">
+            <h3 style="color:#7fb3ff;margin-bottom:16px;">📋 작업 체크리스트</h3>
+            <div style="display:grid;gap:12px;">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(10,23,45,.6);border-radius:8px;">
+                <span style="font-size:1.5em;">${isSetup ? '✅' : '⬜'}</span>
+                <div>
+                  <strong>1단계: 기본 설정</strong>
+                  <div style="font-size:.85em;color:#9cb5e9;">연도, 인원, 총 예산, ⭐전년 예산 입력</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(10,23,45,.6);border-radius:8px;">
+                <span style="font-size:1.5em;">${isSetup ? '✅' : '⬜'}</span>
+                <div>
+                  <strong>2단계: 직원/근무지 설정</strong>
+                  <div style="font-size:.85em;color:#9cb5e9;">직급별, 지역별 인원 및 단가 설정</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(10,23,45,.6);border-radius:8px;">
+                <span style="font-size:1.5em;">${state.programs.length > 0 ? '✅' : '⬜'}</span>
+                <div>
+                  <strong>3단계: 교육계획 입력</strong>
+                  <div style="font-size:.85em;color:#9cb5e9;">프로그램별 상세, ⭐전략목표, ⭐수행분기 입력</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(10,23,45,.6);border-radius:8px;">
+                <span style="font-size:1.5em;">⬜</span>
+                <div>
+                  <strong>4단계: 보고서 생성</strong>
+                  <div style="font-size:.85em;color:#9cb5e9;">경영진 보고용 문서 다운로드</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="section-card">
+          <h2>💡 활용 팁</h2>
+          <div style="display:grid;gap:16px;margin-top:16px;">
+            <div class="info-card">
+              <div class="info-card-title">📊 예산 배분 가이드</div>
+              <div class="info-card-content">
+                <strong>리더십 교육:</strong> 10~20% (임원·관리자 대상)<br>
+                <strong>직무 교육:</strong> 50~70% (전 직원 역량 강화)<br>
+                <strong>법정의무:</strong> 20~30% (산업안전, 성희롱예방 등)
+              </div>
+            </div>
+            <div class="info-card">
+              <div class="info-card-title">💰 단가 참고표</div>
+              <div class="info-card-content">
+                <strong>임원 교육:</strong> 80~100만원/회<br>
+                <strong>팀장 교육:</strong> 50~70만원/회<br>
+                <strong>직원 교육:</strong> 30~50만원/회<br>
+                <strong>법정교육:</strong> 5~10만원/인
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 교육계획 렌더링 (간략화된 버전)
+    function renderPlan() {
+      const el = document.getElementById('plan');
+      if (!el) return;
+
+      const byCategory = {
+        leadership: state.programs.filter(p => p.category === 'leadership'),
+        job: state.programs.filter(p => p.category === 'job'),
+        hierarchy: state.programs.filter(p => p.category === 'hierarchy'),
+        legal: state.programs.filter(p => p.category === 'legal')
+      };
+
+      el.innerHTML = `
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2>📚 교육 프로그램 관리</h2>
+              <div class="section-desc">각 프로그램의 인원, 횟수, 단가를 입력하고 ⭐전략목표와 ⭐수행분기를 설정하세요</div>
+            </div>
+            <button class="button button-primary" onclick="addProgram()">+ 프로그램 추가</button>
+          </div>
+          
+          ${renderProgramCategory('leadership', '🎯 리더십 교육', byCategory.leadership)}
+          ${renderProgramCategory('job', '💼 직무 교육', byCategory.job)}
+          ${renderProgramCategory('hierarchy', '👥 계층별 교육', byCategory.hierarchy)}
+          ${renderProgramCategory('legal', '⚖️ 법정의무 교육', byCategory.legal)}
+        </div>
+      `;
+    }
+
+    function renderProgramCategory(category, title, programs) {
+      const total = programs.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0);
+      
+      const strategyOptions = Object.entries(STRATEGY_GOALS)
+        .map(([key, label]) => `<option value="${key}">${label}</option>`)
+        .join('');
+      
+      return `
+        <div class="toggle-section" style="margin-top:24px;">
+          <div class="toggle-header" onclick="toggleSection(event)">
+            <span class="toggle-icon">▼</span>
+            <h3 style="flex:1;">${title}</h3>
+            <span class="info-badge">
+              ${programs.length}개 프로그램 · ${formatKRW(total)}
+            </span>
+          </div>
+          <div class="toggle-content">
+            <table style="margin-top:16px;">
+              <thead>
+                <tr>
+                  <th>프로그램명</th>
+                  <th>대상인원</th>
+                  <th>연간횟수</th>
+                  <th>회당 단가</th>
+                  <th>소계</th>
+                  <th>⭐전략목표</th>
+                  <th>⭐수행분기</th>
+                  <th>삭제</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${programs.map(p => {
+                  const subtotal = p.headcount * p.rounds * p.unitCost;
+                  return `
+                    <tr>
+                      <td><input type="text" value="${p.name}" onchange="updateProgram(${p.id},'name',this.value)" style="min-width:150px;"></td>
+                      <td><input type="number" value="${p.headcount}" onchange="updateProgram(${p.id},'headcount',+this.value)" min="0" style="width:70px;"></td>
+                      <td><input type="number" value="${p.rounds}" onchange="updateProgram(${p.id},'rounds',+this.value)" min="1" style="width:60px;"></td>
+                      <td><input type="text" value="${formatNumber(p.unitCost)}" onchange="updateProgram(${p.id},'unitCost',Number(this.value.replace(/,/g,'')))" style="width:100px;"></td>
+                      <td><strong>${formatNumber(subtotal)}</strong></td>
+                      <td>
+                        <select onchange="updateProgram(${p.id},'strategicGoal',this.value)" style="width:120px;">
+                          ${Object.entries(STRATEGY_GOALS)
+                            .map(([key, label]) => `<option value="${key}" ${p.strategicGoal === key ? 'selected' : ''}>${label}</option>`)
+                            .join('')}
+                        </select>
+                      </td>
+                      <td>
+                        <select onchange="updateProgram(${p.id},'executionQuarter',this.value)" style="width:80px;">
+                          <option value="1" ${p.executionQuarter == 1 ? 'selected' : ''}>1분기</option>
+                          <option value="2" ${p.executionQuarter == 2 ? 'selected' : ''}>2분기</option>
+                          <option value="3" ${p.executionQuarter == 3 ? 'selected' : ''}>3분기</option>
+                          <option value="4" ${p.executionQuarter == 4 ? 'selected' : ''}>4분기</option>
+                        </select>
+                      </td>
+                      <td><button class="button button-tertiary" onclick="deleteProgram(${p.id})" style="padding:6px 12px;font-size:.85em;">삭제</button></td>
+                    </tr>
+                  `;
+                }).join('') || '<tr><td colspan="8" style="text-align:center;color:#9cb5e9;padding:20px;">프로그램을 추가하세요</td></tr>'}
+              </tbody>
+            </table>
+            <button class="button button-secondary" onclick="addProgramToCategory('${category}')" style="margin-top:12px;">
+              + ${title} 추가
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleSection(event) {
+      const section = event.currentTarget.closest('.toggle-section');
+      section.classList.toggle('collapsed');
+    }
+
+    function addProgram() {
+      const id = state.programs.length > 0 ? Math.max(...state.programs.map(p => p.id)) + 1 : 1;
+      state.programs.push({
+        id,
+        category: 'job',
+        name: '새 프로그램',
+        headcount: 0,
+        rounds: 1,
+        unitCost: 0,
+        description: '',
+        executionQuarter: 1, // ⭐ NEW
+        strategicGoal: 'job' // ⭐ NEW
+      });
+      autoSave();
+      renderPlan();
+      renderSummary();
+    }
+
+    function addProgramToCategory(category) {
+      const id = state.programs.length > 0 ? Math.max(...state.programs.map(p => p.id)) + 1 : 1;
+      
+      const defaults = {
+        leadership: { name: '리더십 프로그램', goal: 'leadership' },
+        job: { name: '직무 프로그램', goal: 'job' },
+        hierarchy: { name: '계층별 프로그램', goal: 'culture' },
+        legal: { name: '법정의무 프로그램', goal: 'compliance' }
+      };
+      
+      state.programs.push({
+        id,
+        category,
+        name: defaults[category]?.name || '새 프로그램',
+        headcount: 0,
+        rounds: 1,
+        unitCost: 0,
+        description: '',
+        executionQuarter: 1, // ⭐ NEW
+        strategicGoal: defaults[category]?.goal || 'other' // ⭐ NEW
+      });
+      autoSave();
+      renderPlan();
+      renderSummary();
+    }
+
+    function updateProgram(id, field, value) {
+      const program = state.programs.find(p => p.id === id);
+      if (program) {
+        program[field] = value;
+        autoSave();
+        renderSummary();
+        renderDashboard();
+      }
+    }
+
+    function deleteProgram(id) {
+      if (confirm('이 프로그램을 삭제하시겠습니까?')) {
+        state.programs = state.programs.filter(p => p.id !== id);
+        autoSave();
+        renderPlan();
+        renderSummary();
+        renderDashboard();
+      }
+    }
+
+    // 예산요약
+    function renderSummary() {
+      const el = document.getElementById('summary');
+      if (!el) return;
+
+      const byCategory = {
+        leadership: state.programs.filter(p => p.category === 'leadership'),
+        job: state.programs.filter(p => p.category === 'job'),
+        hierarchy: state.programs.filter(p => p.category === 'hierarchy'),
+        legal: state.programs.filter(p => p.category === 'legal')
+      };
+
+      const totals = {
+        leadership: byCategory.leadership.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0),
+        job: byCategory.job.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0),
+        hierarchy: byCategory.hierarchy.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0),
+        legal: byCategory.legal.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0)
+      };
+
+      const grandTotal = totals.leadership + totals.job + totals.hierarchy + totals.legal;
+      const variance = state.totalBudget - grandTotal;
+      const variancePercent = state.totalBudget > 0 ? ((variance / state.totalBudget) * 100).toFixed(1) : 0;
+      
+      // ⭐ NEW: YoY 계산
+      let yoyPercent = 0;
+      let yoyColor = 'rgba(16,185,129,.3)';
+      let yoyIcon = '➖';
+      if (state.previousYearBudget > 0) {
+        yoyPercent = ((grandTotal - state.previousYearBudget) / state.previousYearBudget) * 100;
+        if (yoyPercent > 0) {
+          yoyColor = 'rgba(239,68,68,.3)'; // 초과
+          yoyIcon = '▲';
+        } else if (yoyPercent < 0) {
+          yoyColor = 'rgba(16,185,129,.3)'; // 절감
+          yoyIcon = '▼';
+        }
+      }
+
+      el.innerHTML = `
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2>💰 예산 요약</h2>
+              <div class="section-desc">카테고리별 예산 집행 현황</div>
+            </div>
+          </div>
+
+          <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(239,68,68,.3) 0%,rgba(220,38,38,.3) 100%);">
+              <h4>💵 총 확보 예산</h4>
+              <p>${formatNumber(state.totalBudget)}원</p>
+              <span class="mini">${formatKRW(state.totalBudget)}</span>
+            </div>
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(251,191,36,.3) 0%,rgba(245,158,11,.3) 100%);">
+              <h4>📊 총 집행 예정</h4>
+              <p>${formatNumber(grandTotal)}원</p>
+              <span class="mini">${formatKRW(grandTotal)}</span>
+            </div>
+            <div class="metric-card" style="background:linear-gradient(135deg,${variance >= 0 ? 'rgba(16,185,129,.3) 0%,rgba(5,150,105,.3)' : 'rgba(239,68,68,.3) 0%,rgba(220,38,38,.3)'} 100%);">
+              <h4>${variance >= 0 ? '💚 잔여 예산' : '⚠️ 초과 금액'}</h4>
+              <p>${formatNumber(Math.abs(variance))}원</p>
+              <span class="mini">${variancePercent}% ${variance >= 0 ? '남음' : '초과'}</span>
+            </div>
+            <div class="metric-card" style="background:linear-gradient(135deg, ${yoyColor} 0%, ${yoyColor.replace('.3', '.4')} 100%);">
+              <h4>⭐ 전년 대비 (YoY)</h4>
+              <p style="color:${yoyPercent > 0 ? '#ef4444' : '#10b981'};">${yoyIcon} ${yoyPercent.toFixed(1)}%</p>
+              <span class="mini">전년: ${formatKRW(state.previousYearBudget)}</span>
+            </div>
+          </div>
+          
+          <div class="metrics-grid" style="margin-top:16px;">
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(139,92,246,.3) 0%,rgba(109,40,217,.3) 100%);">
+              <h4>🎯 리더십 교육</h4>
+              <p>${formatNumber(totals.leadership)}원</p>
+              <span class="mini">${formatKRW(totals.leadership)}</span>
+            </div>
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(59,130,246,.3) 0%,rgba(29,78,216,.3) 100%);">
+              <h4>💼 직무 교육</h4>
+              <p>${formatNumber(totals.job)}원</p>
+              <span class="mini">${formatKRW(totals.job)}</span>
+            </div>
+            <div class="metric-card">
+              <h4>👥 계층별 교육</h4>
+              <p>${formatNumber(totals.hierarchy)}원</p>
+              <span class="mini">${formatKRW(totals.hierarchy)}</span>
+            </div>
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(16,185,129,.3) 0%,rgba(5,150,105,.3) 100%);">
+              <h4>⚖️ 법정의무 교육</h4>
+              <p>${formatNumber(totals.legal)}원</p>
+              <span class="mini">${formatKRW(totals.legal)}</span>
+            </div>
+          </div>
+
+          ${variance < 0 ? `
+          <div class="info-card" style="margin-top:24px;background:linear-gradient(135deg,rgba(239,68,68,.15) 0%,rgba(220,38,38,.15) 100%);border-color:rgba(239,68,68,.4);">
+            <div class="info-card-title" style="color:#ef4444;">⚠️ 예산 초과 경고</div>
+            <div class="info-card-content">
+              계획된 교육비가 확보된 예산을 <strong>${formatKRW(Math.abs(variance))}</strong> 초과했습니다.
+              일부 프로그램의 규모를 축소하거나 추가 예산 확보를 검토하세요.
+            </div>
+          </div>
+          ` : ''}
+        </div>
+
+        <div class="section-card">
+          <h2>📋 프로그램별 상세 내역</h2>
+          <table style="margin-top:16px;">
+            <thead>
+              <tr>
+                <th>카테고리</th>
+                <th>프로그램명</th>
+                <th>대상인원</th>
+                <th>연간횟수</th>
+                <th>회당 단가</th>
+                <th>소계</th>
+                <th>⭐전략목표</th>
+                <th>⭐수행분기</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${state.programs.map(p => {
+                const subtotal = p.headcount * p.rounds * p.unitCost;
+                const catLabel = p.category === 'leadership' ? '리더십' : p.category === 'job' ? '직무' : p.category === 'hierarchy' ? '계층' : '법정';
+                return `
+                  <tr>
+                    <td><span class="info-badge">${catLabel}</span></td>
+                    <td>${p.name}</td>
+                    <td>${formatNumber(p.headcount)}명</td>
+                    <td>${p.rounds}회</td>
+                    <td>${formatNumber(p.unitCost)}원</td>
+                    <td><strong>${formatNumber(subtotal)}원</strong></td>
+                    <td>${STRATEGY_GOALS[p.strategicGoal] || '기타'}</td>
+                    <td>${p.executionQuarter} 분기</td>
+                  </tr>
+                `;
+              }).join('') || '<tr><td colspan="8" style="text-align:center;color:#9cb5e9;padding:20px;">등록된 프로그램이 없습니다</td></tr>'}
+            </tbody>
+            <tfoot style="background:rgba(31,59,110,.9);">
+              <tr>
+                <th colspan="5" style="text-align:right;">총계</th>
+                <th><strong>${formatNumber(grandTotal)}원</strong><br><span style="font-size:.8em;color:#9cb5e9;">${formatKRW(grandTotal)}</span></th>
+                <th colspan="2"></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      `;
+    }
+
+    // 대시보드
+    function renderDashboard() {
+      const el = document.getElementById('dashboard');
+      if (!el) return;
+      
+      // ⭐ NEW: 차트 데이터 계산
+      const categoryTotals = { leadership: 0, job: 0, hierarchy: 0, legal: 0 };
+      const strategyTotals = {};
+      const quarterlyTotals = { 1: 0, 2: 0, 3: 0, 4: 0 };
+      
+      for(const goalKey in STRATEGY_GOALS) { strategyTotals[goalKey] = 0; }
+
+      state.programs.forEach(p => {
+        const total = p.headcount * p.rounds * p.unitCost;
+        if (categoryTotals[p.category] !== undefined) {
+          categoryTotals[p.category] += total;
+        }
+        if (strategyTotals[p.strategicGoal] !== undefined) {
+          strategyTotals[p.strategicGoal] += total;
+        }
+        if (quarterlyTotals[p.executionQuarter] !== undefined) {
+          quarterlyTotals[p.executionQuarter] += total;
+        }
+      });
+
+      el.innerHTML = `
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2>📊 예산 대시보드</h2>
+              <div class="section-desc">시각화된 예산 분석</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:24px;">
+            <div>
+              <h3 style="color:#7fb3ff;margin-bottom:16px;">카테고리별 예산 배분</h3>
+              <div class="chart-container">
+                <canvas id="categoryChart"></canvas>
+              </div>
+            </div>
+            <div>
+              <h3 style="color:#7fb3ff;margin-bottom:16px;">⭐ 전략목표별 예산 배분</h3>
+              <div class="chart-container">
+                <canvas id="strategyChart"></canvas>
+              </div>
+            </div>
+            <div>
+              <h3 style="color:#7fb3ff;margin-bottom:16px;">⭐ 분기별 집행 계획</h3>
+              <div class="chart-container">
+                <canvas id="quarterlyChart"></canvas>
+              </div>
+            </div>
+            <div>
+              <h3 style="color:#7fb3ff;margin-bottom:16px;">Top 5 고액 프로그램</h3>
+              <div class="chart-container">
+                <canvas id="topProgramsChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      setTimeout(() => {
+        renderCategoryChart(categoryTotals);
+        renderStrategyChart(strategyTotals); // ⭐ NEW
+        renderQuarterlyChart(quarterlyTotals); // ⭐ NEW
+        renderTopProgramsChart();
+      }, 100);
+    }
+
+    function renderCategoryChart(totals) {
+      const ctx = document.getElementById('categoryChart');
+      if (!ctx || !window.Chart) return;
+
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['리더십 교육', '직무 교육', '계층별 교육', '법정의무 교육'],
+          datasets: [{
+            data: [totals.leadership, totals.job, totals.hierarchy, totals.legal],
+            backgroundColor: ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#dbe7ff', font: { size: 12 } }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.label + ': ' + formatKRW(context.raw);
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ⭐ NEW
+    function renderStrategyChart(totals) {
+      const ctx = document.getElementById('strategyChart');
+      if (!ctx || !window.Chart) return;
+      
+      const labels = Object.keys(totals).map(key => STRATEGY_GOALS[key]);
+      const data = Object.values(totals);
+
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: ['#ef4444', '#8b5cf6', '#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#64748b'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#dbe7ff', font: { size: 12 } }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.label + ': ' + formatKRW(context.raw);
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ⭐ NEW (modified from monthly)
+    function renderQuarterlyChart(totals) {
+      const ctx = document.getElementById('quarterlyChart');
+      if (!ctx || !window.Chart) return;
+
+      const data = Object.values(totals);
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['1분기', '2분기', '3분기', '4분기'],
+          datasets: [{
+            label: '분기별 집행 예정',
+            data: data,
+            backgroundColor: '#5790ff',
+            borderColor: '#5790ff',
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return '집행액: ' + formatKRW(context.raw);
+                }
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#dbe7ff' }, grid: { display: false } },
+            y: { 
+              ticks: { 
+                color: '#dbe7ff',
+                callback: function(value) {
+                  return formatKRW(value);
+                }
+              }, 
+              grid: { color: 'rgba(63,88,135,.3)' } 
+            }
+          }
+        }
+      });
+    }
+
+    function renderTopProgramsChart() {
+      const ctx = document.getElementById('topProgramsChart');
+      if (!ctx || !window.Chart) return;
+
+      const sorted = [...state.programs]
+        .map(p => ({ name: p.name, total: p.headcount * p.rounds * p.unitCost }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: sorted.map(p => p.name),
+          datasets: [{
+            label: '예산 (원)',
+            data: sorted.map(p => p.total),
+            backgroundColor: '#10b981',
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return formatKRW(context.raw);
+                }
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#dbe7ff' }, grid: { color: 'rgba(63,88,135,.3)' } },
+            y: { ticks: { color: '#dbe7ff' }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    // 경영보고서
+    function renderReport() {
+      const el = document.getElementById('report');
+      if (!el) return;
+
+      const categoryTotals = { leadership: 0, job: 0, hierarchy: 0, legal: 0 };
+      const byCategory = { leadership: [], job: [], hierarchy: [], legal: [] };
+      const strategyTotals = {};
+      for(const goalKey in STRATEGY_GOALS) { strategyTotals[goalKey] = 0; }
+      
+      state.programs.forEach(p => {
+        const total = p.headcount * p.rounds * p.unitCost;
+        if (categoryTotals[p.category] !== undefined) {
+          categoryTotals[p.category] += total;
+          byCategory[p.category].push(p);
+        }
+        if (strategyTotals[p.strategicGoal] !== undefined) {
+          strategyTotals[p.strategicGoal] += total;
+        }
+      });
+      
+      const grandTotal = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
+      const perPerson = state.totalHeadcount > 0 ? Math.floor(grandTotal / state.totalHeadcount) : 0;
+      
+      // ⭐ NEW: YoY 계산
+      let yoyPercent = 0;
+      let yoyColor = '#64748b';
+      let yoyIcon = '➖';
+      if (state.previousYearBudget > 0) {
+        yoyPercent = ((grandTotal - state.previousYearBudget) / state.previousYearBudget) * 100;
+        if (yoyPercent > 0) {
+          yoyColor = '#dc2626'; // 초과
+          yoyIcon = '▲';
+        } else if (yoyPercent < 0) {
+          yoyColor = '#059669'; // 절감
+          yoyIcon = '▼';
+        }
+      }
+
+      el.innerHTML = `
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2>📄 경영진 보고서</h2>
+              <div class="section-desc">인쇄 또는 PDF로 저장하세요 (Ctrl+P)</div>
+            </div>
+            <button class="button button-primary" onclick="window.print()">🖨️ 인쇄/PDF 저장</button>
+          </div>
+        </div>
+
+        <div class="section-card" style="background:#fff;color:#000;padding:48px;">
+          <div style="text-align:center;margin-bottom:40px;border-bottom:3px solid #2a63ff;padding-bottom:24px;">
+            <h1 style="font-size:2.2em;color:#1e40af;margin-bottom:12px;">${state.year}년도 교육비 사업계획</h1>
+            <p style="font-size:1.1em;color:#64748b;">Education Budget Plan</p>
+          </div>
+
+          <div class="report-section">
+            <h3>1. 요약 (Executive Summary)</h3>
+            <div class="report-kpi" style="grid-template-columns: repeat(3, 1fr); gap: 16px;">
+              <div class="report-kpi-item" style="background:#eff6ff;">
+                <span class="report-kpi-label" style="color:#1e40af;">총 예산 (A)</span>
+                <span class="report-kpi-value" style="color:#1e3a8a;">${formatNumber(grandTotal)} 원</span>
+                <div style="font-size:.85em;color:#64748b;margin-top:4px;">${formatKRW(grandTotal)}</div>
+              </div>
+              <div class="report-kpi-item" style="background:#f0fdf4;">
+                <span class="report-kpi-label" style="color:#15803d;">전년 예산 (B)</span>
+                <span class="report-kpi-value" style="color:#166534;">${formatNumber(state.previousYearBudget)} 원</span>
+                <div style="font-size:.85em;color:#64748b;margin-top:4px;">${formatKRW(state.previousYearBudget)}</div>
+              </div>
+              <div class="report-kpi-item" style="background:#fefce8;">
+                <span class="report-kpi-label" style="color:#a16207;">⭐ 전년 대비 (A-B)/B</span>
+                <span class="report-kpi-value" style="color:${yoyColor};">${yoyIcon} ${yoyPercent.toFixed(1)} %</span>
+              </div>
+              <div class="report-kpi-item" style="background:#f8fafc;">
+                <span class="report-kpi-label" style="color:#334155;">대상 인원</span>
+                <span class="report-kpi-value" style="color:#1e293b;">${formatNumber(state.totalHeadcount)} 명</span>
+              </div>
+              <div class="report-kpi-item" style="background:#f8fafc;">
+                <span class="report-kpi-label" style="color:#334155;">1인당 교육비</span>
+                <span class="report-kpi-value" style="color:#1e293b;">${formatKRW(perPerson)}</span>
+              </div>
+              <div class="report-kpi-item" style="background:#f8fafc;">
+                <span class="report-kpi-label" style="color:#334155;">총 프로그램 수</span>
+                <span class="report-kpi-value" style="color:#1e293b;">${state.programs.length} 개</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="report-section">
+            <h3>2. 예산 배분 계획</h3>
+            <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+              <thead>
+                <tr style="background:#1e40af;color:#fff;">
+                  <th style="padding:12px;text-align:left;border:1px solid #ddd;">구분</th>
+                  <th style="padding:12px;text-align:right;border:1px solid #ddd;">예산 (원)</th>
+                  <th style="padding:12px;text-align:right;border:1px solid #ddd;">비중 (%)</th>
+                  <th style="padding:12px;text-align:center;border:1px solid #ddd;">프로그램 수</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="padding:12px;border:1px solid #ddd;">🎯 리더십 교육</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ddd;">${formatNumber(categoryTotals.leadership)}</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ddd;">${grandTotal > 0 ? ((categoryTotals.leadership/grandTotal)*100).toFixed(1) : 0}%</td>
+                  <td style="padding:12px;text-align:center;border:1px solid #ddd;">${byCategory.leadership.length}개</td>
+                </tr>
+                <tr style="background:#f8fafc;">
+                  <td style="padding:12px;border:1px solid #ddd;">💼 직무 교육</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ddd;">${formatNumber(categoryTotals.job)}</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ddd;">${grandTotal > 0 ? ((categoryTotals.job/grandTotal)*100).toFixed(1) : 0}%</td>
+                  <td style="padding:12px;text-align:center;border:1px solid #ddd;">${byCategory.job.length}개</td>
+                </tr>
+                <tr>
+                  <td style="padding:12px;border:1px solid #ddd;">👥 계층별 교육</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ddd;">${formatNumber(categoryTotals.hierarchy)}</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ddd;">${grandTotal > 0 ? ((categoryTotals.hierarchy/grandTotal)*100).toFixed(1) : 0}%</td>
+                  <td style="padding:12px;text-align:center;border:1px solid #ddd;">${byCategory.hierarchy.length}개</td>
+                </tr>
+                <tr style="background:#f8fafc;">
+                  <td style="padding:12px;border:1px solid #ddd;">⚖️ 법정의무 교육</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ddd;">${formatNumber(categoryTotals.legal)}</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ddd;">${grandTotal > 0 ? ((categoryTotals.legal/grandTotal)*100).toFixed(1) : 0}%</td>
+                  <td style="padding:12px;text-align:center;border:1px solid #ddd;">${byCategory.legal.length}개</td>
+                </tr>
+                <tr style="background:#1e40af;color:#fff;font-weight:700;">
+                  <td style="padding:12px;border:1px solid #ddd;">합계</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ddd;">${formatNumber(grandTotal)}</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ddd;">100%</td>
+                  <td style="padding:12px;text-align:center;border:1px solid #ddd;">${state.programs.length}개</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="report-section">
+            <h3>3. ⭐ 전략목표별 예산 (Strategy Alignment)</h3>
+            <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+              <thead>
+                <tr style="background:#1e40af;color:#fff;">
+                  <th style="padding:12px;text-align:left;border:1px solid #ddd;">전략 목표</th>
+                  <th style="padding:12px;text-align:right;border:1px solid #ddd;">예산 (원)</th>
+                  <th style="padding:12px;text-align:right;border:1px solid #ddd;">비중 (%)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${Object.entries(strategyTotals).filter(([,total]) => total > 0).map(([key, total]) => `
+                  <tr style="background:#f8fafc;">
+                    <td style="padding:12px;border:1px solid #ddd;">${STRATEGY_GOALS[key]}</td>
+                    <td style="padding:12px;text-align:right;border:1px solid #ddd;">${formatNumber(total)}</td>
+                    <td style="padding:12px;text-align:right;border:1px solid #ddd;">${grandTotal > 0 ? ((total/grandTotal)*100).toFixed(1) : 0}%</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="report-section">
+            <h3>4. 주요 교육 프로그램</h3>
+            
+            <div style="margin-top:20px;">
+              <h4 style="color:#1e40af;margin-bottom:12px;font-size:1.1em;">가. 리더십 교육</h4>
+              <div style="background:#f8fafc;padding:16px;border-radius:8px;border:1px solid #e2e8f0;">
+                ${byCategory.leadership.length > 0 ? `
+                  <ul style="margin-left:20px;line-height:1.8;">
+                    ${byCategory.leadership.map(p => {
+                      const total = p.headcount * p.rounds * p.unitCost;
+                      return `<li><strong>${p.name}</strong> (<strong>${p.executionQuarter}분기</strong>): ${p.headcount}명 × ${p.rounds}회 = ${formatKRW(total)}<br>
+                      <span style="color:#64748b;font-size:.9em;">${p.description || '리더십 역량 강화'}</span></li>`;
+                    }).join('')}
+                  </ul>
+                ` : '<p style="color:#64748b;">등록된 프로그램이 없습니다.</p>'}
+              </div>
+            </div>
+
+            <div style="margin-top:20px;">
+              <h4 style="color:#1e40af;margin-bottom:12px;font-size:1.1em;">나. 직무 교육</h4>
+              <div style="background:#f8fafc;padding:16px;border-radius:8px;border:1px solid #e2e8f0;">
+                ${byCategory.job.length > 0 ? `
+                  <ul style="margin-left:20px;line-height:1.8;">
+                    ${byCategory.job.map(p => {
+                      const total = p.headcount * p.rounds * p.unitCost;
+                      return `<li><strong>${p.name}</strong> (<strong>${p.executionQuarter}분기</strong>): ${p.headcount}명 × ${p.rounds}회 = ${formatKRW(total)}<br>
+                      <span style="color:#64748b;font-size:.9em;">${p.description || '직무 전문성 향상'}</span></li>`;
+                    }).join('')}
+                  </ul>
+                ` : '<p style="color:#64748b;">등록된 프로그램이 없습니다.</p>'}
+              </div>
+            </div>
+
+            <div style="margin-top:20px;">
+              <h4 style="color:#1e40af;margin-bottom:12px;font-size:1.1em;">다. 법정의무 교육</h4>
+              <div style="background:#f8fafc;padding:16px;border-radius:8px;border:1px solid #e2e8f0;">
+                ${byCategory.legal.length > 0 ? `
+                  <ul style="margin-left:20px;line-height:1.8;">
+                    ${byCategory.legal.map(p => {
+                      const total = p.headcount * p.rounds * p.unitCost;
+                      return `<li><strong>${p.name}</strong> (<strong>${p.executionQuarter}분기</strong>): ${p.headcount}명 × ${p.rounds}회 = ${formatKRW(total)}<br>
+                      <span style="color:#64748b;font-size:.9em;">${p.description || '법정 준수 교육'}</span></li>`;
+                    }).join('')}
+                  </ul>
+                ` : '<p style="color:#64748b;">등록된 프로그램이 없습니다.</p>'}
+              </div>
+            </div>
+          </div>
+
+          <div class="report-section">
+            <h3>5. 기대 효과 (전략목표 중심)</h3>
+            <div style="background:#f8fafc;padding:20px;border-radius:8px;border:1px solid #e2e8f0;">
+              <p style="margin-bottom:16px;line-height:1.7;">본 예산은 다음과 같은 회사의 핵심 전략 목표 달성에 기여합니다.</p>
+              <ul style="margin-left:20px;line-height:2;">
+                ${Object.entries(strategyTotals).filter(([,total]) => total > 0).map(([key, total]) => `
+                  <li><strong>${STRATEGY_GOALS[key]}</strong>: 총 <strong>${formatKRW(total)}</strong> 투입을 통한 역량 확보</li>
+                `).join('')}
+              </ul>
+            </div>
+          </div>
+
+          <div style="margin-top:48px;padding-top:24px;border-top:2px solid #e2e8f0;text-align:right;color:#64748b;">
+            <p>작성일: ${new Date().toLocaleDateString('ko-KR')}</p>
+            <p style="margin-top:8px;">인사팀 / 교육담당</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // 고급설정
+    function renderAdvanced() {
+      // ... (코드는 변경 없음) ...
+      const el = document.getElementById('advanced');
+      if (!el) return;
+
+      el.innerHTML = `
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2>⚙️ 고급 설정</h2>
+              <div class="section-desc">세부 옵션 및 데이터 관리</div>
+            </div>
+          </div>
+
+          <div class="info-card">
+            <div class="info-card-title">💾 데이터 관리</div>
+            <div class="info-card-content">
+              현재 설정과 프로그램 데이터를 저장하거나 불러올 수 있습니다.
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;">
+            <button class="button button-primary" onclick="exportData()">📥 데이터 내보내기 (JSON)</button>
+            <button class="button button-secondary" onclick="importData()">📤 데이터 불러오기</button>
+            <button class="button button-success" onclick="manualSave()">💾 수동 저장</button>
+            <button class="button button-tertiary" onclick="clearAllData()">🔄 전체 초기화</button>
+          </div>
+
+          <div class="info-card" style="margin-top:20px;">
+            <div class="info-card-title">💡 저장 기능 안내</div>
+            <div class="info-card-content">
+              <strong>자동 저장:</strong> 데이터 입력 시 2초 후 자동으로 저장됩니다<br>
+              <strong>수동 저장:</strong> 상단의 '💾 저장' 버튼을 클릭하여 즉시 저장<br>
+              <strong>저장 위치:</strong> 브라우저의 로컬 스토리지 (같은 브라우저에서만 접근 가능)<br>
+              <strong>백업 권장:</strong> 중요한 데이터는 '📥 데이터 내보내기'로 파일로 저장하세요
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 유틸리티 함수들
+    function calculateTotal() {
+      return state.programs.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0);
+    }
+
+    function loadSample() {
+      if (confirm('샘플 데이터를 불러오시겠습니까? 현재 데이터는 삭제됩니다.')) {
+        state.year = new Date().getFullYear() + 1;
+        state.totalHeadcount = 250;
+        state.totalBudget = 500000000;
+        state.previousYearBudget = 450000000; // ⭐ NEW
+        state.wizardCompleted = true;
+        initializeWithWizardData();
+        saveToLocalStorage();
+        showSaveNotification('샘플 데이터 로드 완료');
+        renderAllTabs();
+      }
+    }
+
+    function exportData() {
+      const data = JSON.stringify(state, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `교육비예산_${state.year}_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showSaveNotification('데이터 내보내기 완료');
+    }
+
+    function importData() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const imported = JSON.parse(event.target.result);
+            Object.assign(state, imported);
+            saveToLocalStorage();
+            renderAllTabs();
+            showSaveNotification('데이터를 성공적으로 불러왔습니다');
+          } catch (err) {
+            alert('파일을 읽을 수 없습니다: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    function clearAllData() {
+      if (confirm('⚠️ 모든 데이터를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며,\n현재 작업 중인 모든 내용이 삭제됩니다.')) {
+        if (confirm('정말로 삭제하시겠습니까?')) {
+          localStorage.removeItem(STORAGE_KEY);
+          // state 객체 자체를 초기화하지 않고, 내부 속성을 리셋합니다.
+          Object.assign(state, {
+            year: new Date().getFullYear() + 1,
+            totalHeadcount: 250,
+            totalBudget: 500000000,
+            previousYearBudget: 450000000, // ⭐ NEW
+            leadershipRatio: 15,
+            jobRatio: 45,
+            hierarchyRatio: 15,
+            legalRatio: 25,
+            programs: [],
+            wizardStep: 1,
+            wizardCompleted: false,
+            lastSaved: null,
+            employeeComposition: { junior: 100, senior: 80, manager: 50, executive: 20 },
+            locationDistribution: {
+              yeongcheon: { name: '영천', count: 120, customerTrainingCost: 300000 },
+              gyeongsan: { name: '경산', count: 80, customerTrainingCost: 320000 },
+              yesan: { name: '예산', count: 30, customerTrainingCost: 350000 },
+              anyang: { name: '안양', count: 20, customerTrainingCost: 380000 }
+            },
+            jobEducationPolicy: { /* ... 기본값 ... */ },
+            hierarchyPrograms: { /* ... 기본값 ... */ }
+          });
+          
+          // 기본값 재할당 (중첩 객체)
+          state.jobEducationPolicy = {
+            junior: { customerTraining: true, externalTraining: true, externalSessions: 2, externalUnitCost: 550000 },
+            senior: { customerTraining: true, externalTraining: true, externalSessions: 2, externalUnitCost: 600000 },
+            manager: { customerTraining: true, externalTraining: false, externalSessions: 0, externalUnitCost: 0 },
+            executive: { customerTraining: false, externalTraining: false, externalSessions: 0, externalUnitCost: 0 }
+          };
+          state.hierarchyPrograms = {
+            newEmployee: { name: '신입사원 입문교육', count: 15, unitCost: 500000 },
+            retirement: { name: '정년퇴직 재취업지원', count: 5, unitCost: 300000 }
+          };
+
+          renderAllTabs();
+          updateSaveStatus();
+          showSaveNotification('모든 데이터가 삭제되었습니다');
+        }
+      }
+    }
+
+
+    function renderAllTabs() {
+      renderQuickStart();
+      renderEmployee();
+      renderLocation();
+      renderPlan();
+      renderSummary();
+      renderDashboard();
+      renderReport();
+      renderAdvanced();
+    }
+
+    // 초기화
+    document.addEventListener('DOMContentLoaded', () => {
+      const loaded = loadFromLocalStorage();
+      if (loaded) {
+        console.log('저장된 데이터를 불러왔습니다.');
+      }
+      
+      renderAllTabs();
+      
+      setInterval(updateSaveStatus, 60000);
+      
+      setTimeout(() => {
+        if (!state.wizardCompleted) {
+          showWizard();
+        }
+      }, 500);
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+      if (autoSaveTimer) {
+        saveToLocalStorage();
+      }
+    });
+  </script>
 </body>
 </html>
