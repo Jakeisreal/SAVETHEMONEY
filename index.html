@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>교육비 예산 수립 통합 어시스턴트 v2.2 (전략연계)</title>
+  <title>교육비 예산 수립 통합 어시스턴트 v2.3 (YoY 비교)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
@@ -170,7 +171,7 @@
 <body>
   <div class="save-status-bar">
     <div class="status-left">
-      <div style="font-weight:600;color:#7fb3ff;">📊 교육비 예산 수립 v2.2</div>
+      <div style="font-weight:600;color:#7fb3ff;">📊 교육비 예산 수립 v2.3</div>
       <div id="saveStatus" style="color:#9cb5e9;font-size:.85em;">저장된 데이터 없음</div>
     </div>
     <div class="status-right">
@@ -257,15 +258,14 @@
   </div>
 
   <script>
-    // 상태 관리
-    const STORAGE_KEY = 'educationBudgetData_v2';
+    const STORAGE_KEY = 'educationBudgetData_v23';
     let autoSaveTimer = null;
 
     const state = {
       year: new Date().getFullYear() + 1,
       totalHeadcount: 250,
       totalBudget: 500000000,
-      previousYearBudget: 450000000, // ⭐ NEW: 전년도 예산 추가
+      previousYearBudget: 450000000,
       leadershipRatio: 15,
       jobRatio: 45,
       hierarchyRatio: 15,
@@ -322,7 +322,6 @@
       }
     };
     
-    // ⭐ NEW: 전략 목표 상수
     const STRATEGY_GOALS = {
       digital: '디지털 전환 (DT)',
       leadership: '핵심인재/리더십',
@@ -333,7 +332,6 @@
       other: '기타'
     };
 
-    // 자동저장 함수
     function autoSave() {
       if (autoSaveTimer) clearTimeout(autoSaveTimer);
       
@@ -361,12 +359,11 @@
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const data = JSON.parse(saved);
-          // 이전 버전에 없던 값 기본값 할당
           if (!data.previousYearBudget) data.previousYearBudget = 450000000;
-          if (data.programs && !data.programs[0]?.strategicGoal) {
-            data.programs.forEach((p, i) => {
-              p.strategicGoal = 'other';
-              p.executionQuarter = (i % 4) + 1;
+          if (data.programs && data.programs[0] && !data.programs[0].previousYearBudget) {
+            data.programs.forEach(p => {
+              p.previousYearBudget = p.previousYearBudget || 0;
+              p.changeReason = p.changeReason || '';
             });
           }
           Object.assign(state, data);
@@ -432,7 +429,6 @@
       }
     }
 
-    // 유틸리티
     function formatKRW(n) {
       n = Math.floor(Number(n) || 0);
       if (n === 0) return '0원';
@@ -450,7 +446,6 @@
       return Number(n || 0).toLocaleString('ko-KR');
     }
 
-    // 마법사
     function showWizard() {
       state.wizardStep = 1;
       document.getElementById('wizardOverlay').classList.add('active');
@@ -530,7 +525,6 @@
           </div>
         `;
       } else if (step === 2) {
-        // ... (step 2 코드는 변경 없음) ...
         const comp = state.employeeComposition;
         const locations = state.locationDistribution;
         const totalLocationCount = Object.values(locations).reduce((sum, loc) => sum + loc.count, 0);
@@ -643,7 +637,6 @@
           ` : ''}
         `;
       } else if (step === 3) {
-        // ... (step 3 코드는 변경 없음) ...
         content.innerHTML = `
           <div class="info-card">
             <div class="info-card-title">📚 주요 교육 프로그램 설정</div>
@@ -700,7 +693,6 @@
           </div>
         `;
       } else if (step === 4) {
-        // ... (step 4 코드는 변경 없음) ...
         const leadership = Math.floor(state.totalBudget * state.leadershipRatio / 100);
         const job = Math.floor(state.totalBudget * state.jobRatio / 100);
         const legal = Math.floor(state.totalBudget * state.legalRatio / 100);
@@ -786,8 +778,8 @@
           <div class="info-card" style="margin-top:20px;">
             <div class="info-card-title">📌 다음 단계</div>
             <div class="info-card-content">
-              1. <strong>교육계획</strong> 탭에서 세부 프로그램을 입력하세요<br>
-              2. <strong>예산요약</strong>에서 배분 현황을 확인하세요<br>
+              1. <strong>교육계획</strong> 탭에서 세부 프로그램과 전년도 예산을 입력하세요<br>
+              2. <strong>예산요약</strong>에서 배분 현황과 YoY 비교를 확인하세요<br>
               3. <strong>경영보고서</strong>를 생성하여 경영진께 보고하세요
             </div>
           </div>
@@ -894,8 +886,10 @@
           rounds: 2,
           unitCost: 800000,
           description: '전략적 의사결정 및 조직 관리',
-          executionQuarter: 2, // ⭐ NEW
-          strategicGoal: 'leadership' // ⭐ NEW
+          executionQuarter: 2,
+          strategicGoal: 'leadership',
+          previousYearBudget: 0,
+          changeReason: ''
         },
         {
           id: 2,
@@ -905,8 +899,10 @@
           rounds: 2,
           unitCost: 600000,
           description: '팀 빌딩 및 코칭 스킬',
-          executionQuarter: 3, // ⭐ NEW
-          strategicGoal: 'leadership' // ⭐ NEW
+          executionQuarter: 3,
+          strategicGoal: 'leadership',
+          previousYearBudget: 0,
+          changeReason: ''
         },
         {
           id: 3,
@@ -917,8 +913,10 @@
           unitCost: Math.floor(jobBudget.customer / (comp.junior + comp.senior + comp.manager || 1)),
           description: '영천/경산/예산/안양 지역별 고객사 교육',
           isCustomerTraining: true,
-          executionQuarter: 1, // ⭐ NEW
-          strategicGoal: 'job' // ⭐ NEW
+          executionQuarter: 1,
+          strategicGoal: 'job',
+          previousYearBudget: 0,
+          changeReason: ''
         },
         {
           id: 4,
@@ -929,8 +927,10 @@
           unitCost: Math.floor(jobBudget.external / ((comp.junior + comp.senior) * 2 || 1)),
           description: '외부 전문기관 교육 (주임/선임 역량 강화)',
           isExternalTraining: true,
-          executionQuarter: 2, // ⭐ NEW
-          strategicGoal: 'digital' // ⭐ NEW
+          executionQuarter: 2,
+          strategicGoal: 'digital',
+          previousYearBudget: 0,
+          changeReason: ''
         },
         {
           id: 5,
@@ -940,8 +940,10 @@
           rounds: 1,
           unitCost: hier.newEmployee.unitCost,
           description: '신규 입사자 대상 회사 소개 및 직무 기초',
-          executionQuarter: 1, // ⭐ NEW
-          strategicGoal: 'culture' // ⭐ NEW
+          executionQuarter: 1,
+          strategicGoal: 'culture',
+          previousYearBudget: 0,
+          changeReason: ''
         },
         {
           id: 6,
@@ -951,8 +953,10 @@
           rounds: 1,
           unitCost: hier.retirement.unitCost,
           description: '정년퇴직 예정자 대상 제2의 인생 설계',
-          executionQuarter: 4, // ⭐ NEW
-          strategicGoal: 'culture' // ⭐ NEW
+          executionQuarter: 4,
+          strategicGoal: 'culture',
+          previousYearBudget: 0,
+          changeReason: ''
         },
         {
           id: 7,
@@ -962,8 +966,10 @@
           rounds: 1,
           unitCost: 80000,
           description: '법정의무 연간 8시간',
-          executionQuarter: 1, // ⭐ NEW
-          strategicGoal: 'compliance' // ⭐ NEW
+          executionQuarter: 1,
+          strategicGoal: 'compliance',
+          previousYearBudget: 0,
+          changeReason: ''
         },
         {
           id: 8,
@@ -973,15 +979,16 @@
           rounds: 1,
           unitCost: 50000,
           description: '법정의무 연간 1시간',
-          executionQuarter: 2, // ⭐ NEW
-          strategicGoal: 'compliance' // ⭐ NEW
+          executionQuarter: 2,
+          strategicGoal: 'compliance',
+          previousYearBudget: 0,
+          changeReason: ''
         }
       ];
       renderAllTabs();
       autoSave();
     }
 
-    // 탭 전환
     function switchTab(tabName) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -1010,9 +1017,7 @@
       if (tabName === 'advanced') renderAdvanced();
     }
 
-    // 근무지역 관리
     function renderLocation() {
-      // ... (코드는 변경 없음) ...
       const el = document.getElementById('location');
       if (!el) return;
 
@@ -2339,5 +2344,6 @@
   </script>
 </body>
 </html>
+
 
 
