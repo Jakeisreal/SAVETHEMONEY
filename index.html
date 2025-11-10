@@ -1536,17 +1536,19 @@
         leadership: state.programs.filter(p => p.category === 'leadership'),
         job: state.programs.filter(p => p.category === 'job'),
         hierarchy: state.programs.filter(p => p.category === 'hierarchy'),
-        legal: state.programs.filter(p => p.category === 'legal')
+        legal: state.programs.filter(p => p.category === 'legal'),
+        other: state.programs.filter(p => !['leadership','job','hierarchy','legal'].includes(p.category))
       };
 
       const totals = {
         leadership: byCategory.leadership.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0),
         job: byCategory.job.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0),
         hierarchy: byCategory.hierarchy.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0),
-        legal: byCategory.legal.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0)
+        legal: byCategory.legal.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0),
+        other: byCategory.other.reduce((sum, p) => sum + (p.headcount * p.rounds * p.unitCost), 0)
       };
 
-      const grandTotal = totals.leadership + totals.job + totals.hierarchy + totals.legal;
+      const grandTotal = totals.leadership + totals.job + totals.hierarchy + totals.legal + totals.other;
       const variance = state.totalBudget - grandTotal;
       const variancePercent = state.totalBudget > 0 ? ((variance / state.totalBudget) * 100).toFixed(1) : 0;
       
@@ -1564,6 +1566,24 @@
           yoyIcon = '▼';
         }
       }
+      
+      // 카테고리 순서 정의 (리더십 → 직무 → 계층 → 법정 → 기타)
+      const categoryOrder = ['leadership', 'job', 'hierarchy', 'legal', 'other'];
+      const categoryLabels = {
+        leadership: '🎯 리더십',
+        job: '💼 직무',
+        hierarchy: '👥 계층',
+        legal: '⚖️ 법정',
+        other: '📌 기타'
+      };
+      
+      // 정렬된 프로그램 배열 생성
+      const sortedPrograms = [];
+      categoryOrder.forEach(category => {
+        if (byCategory[category] && byCategory[category].length > 0) {
+          sortedPrograms.push(...byCategory[category]);
+        }
+      });
 
       el.innerHTML = `
         <div class="section-card">
@@ -2319,3 +2339,4 @@
   </script>
 </body>
 </html>
+
